@@ -120,7 +120,7 @@ The heavy lifting (running tests, opening PRs, iterating on bot reviews) happens
 ### Install
 
 ```bash
-git clone https://github.com/your-org/symphony.git
+git clone https://github.com/fbaltor/symphony.git
 cd symphony
 npm install
 cp .env.example .env

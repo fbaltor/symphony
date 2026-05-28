@@ -19,7 +19,7 @@ The fastest path to a running Symphony instance with a local Postgres.
 
 ```bash
 # 1. Clone and configure
-git clone https://github.com/your-org/symphony.git
+git clone https://github.com/fbaltor/symphony.git
 cd symphony
 cp WORKFLOW.example.md WORKFLOW.md
 # Edit WORKFLOW.md — fill in tracker.api_key, tracker.team_id,
