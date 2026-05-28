@@ -1,0 +1,30 @@
+# Build output
+dist/
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Dependencies
+node_modules/
+infra/node_modules/
+
+# Test / coverage artifacts
+coverage/
+
+# Lockfiles — pnpm formats these itself; let it own them
+pnpm-lock.yaml
+infra/package-lock.json
+
+# Credentials / env files — must never be reformatted
+.env
+.env.*
+!.env.example
+
+# Pulumi stack outputs (locked secrets)
+infra/Pulumi.*.yaml.bak
+
+# Generated SQL — preserve raw formatting
+src/audit/*.generated.sql
+
+# Minified output
+*.min.js
+*.min.css

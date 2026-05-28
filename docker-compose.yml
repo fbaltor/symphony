@@ -1,0 +1,50 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: symphony
+      POSTGRES_PASSWORD: symphony
+      POSTGRES_DB: symphony
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/audit/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U symphony"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  symphony:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Override DATABASE_URL to point at the compose postgres service.
+      DATABASE_URL: postgresql://symphony:symphony@postgres:5432/symphony
+      # Override SYMPHONY_WORKFLOW_PATH if you want to use a file outside
+      # the image; combine with a volume mount below.
+      # SYMPHONY_WORKFLOW_PATH: /config/WORKFLOW.md
+    volumes:
+      # Mount your WORKFLOW.md into the container (comment out if you bake
+      # it into the image via the Dockerfile COPY instead).
+      - ./WORKFLOW.md:/app/WORKFLOW.md:ro
+      # Workspace storage for cloned repos (tmpfs alternative for long-lived
+      # containers where workspaces should survive restarts).
+      # - workspace_data:/tmp/symphony-workspaces
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres_data:
+  # workspace_data:

@@ -1,0 +1,60 @@
+{
+  "name": "@symphony/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Symphony — autonomous software pipeline daemon. Polls an issue tracker, prepares per-issue workspaces, and dispatches AI coding agents through a configurable multi-state pipeline.",
+  "license": "MIT",
+  "homepage": "https://github.com/fbaltor/symphony#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fbaltor/symphony.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.15.9",
+  "main": "dist/main.js",
+  "bin": {
+    "symphony": "dist/main.js"
+  },
+  "scripts": {
+    "postinstall": "node scripts/patch-claude-sdk.mjs",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:conformance": "vitest run tests/conformance",
+    "test:integration": "vitest run tests/integration",
+    "migrate": "bash scripts/migrate.sh"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.0",
+    "@slack/web-api": "^7.7.0",
+    "liquidjs": "^10.16.1",
+    "pg": "^8.13.1",
+    "pino": "^9.5.0",
+    "yaml": "^2.6.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/pg": "^8.11.10",
+    "@typescript-eslint/eslint-plugin": "^8.15.0",
+    "@typescript-eslint/parser": "^8.15.0",
+    "eslint": "^9.15.0",
+    "pino-pretty": "^11.3.0",
+    "prettier": "^3.3.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}

@@ -1,0 +1,22 @@
+# Per-Dockerfile ignore used when building with -f docker/Dockerfile.
+# Excludes files not needed in the build context to keep it small.
+
+node_modules/
+dist/
+coverage/
+tests/
+.git/
+.github/
+
+# Env files — must never enter the image.
+.env
+.env.*
+!.env.example
+
+# Infrastructure / tooling not referenced by the Dockerfile.
+infra/
+docker/
+
+# Development artifacts.
+*.log
+.wrangler/
