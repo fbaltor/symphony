@@ -86,16 +86,16 @@ The heavy lifting (running tests, opening PRs, iterating on bot reviews) happens
 | Path | Purpose |
 | --- | --- |
 | `src/main.ts` | CLI entry; argv parse; daemon bootstrap |
-| `src/orchestrator/` | Poll tick, retry queue, reconciliation (spec §7, §8) |
+| `src/orchestrator/` | Poll tick, retry queue, reconciliation ([spec §7](docs/upstream-spec.md#7-orchestration-state-machine), [§8](docs/upstream-spec.md#8-polling-scheduling-and-reconciliation)) |
 | `src/orchestrator/cascade.ts` | Development, Cancel, Sub-Done cascade modules |
 | `src/agents/` | Per-state specialist modules — `prioritized/`, `technical-plan/`, `pr-validation/`, `release/` |
 | `src/agents/index.ts` | Specialist registry — maps Linear state to specialist module |
 | `src/webhook/` | Linear webhook receiver (HMAC + dedup + cascade routing) |
-| `src/workflow/` | WORKFLOW.md loader, typed config, fs watch + reload (spec §5, §6) |
-| `src/tracker/` | Linear GraphQL client, payload normalization (spec §11) |
+| `src/workflow/` | WORKFLOW.md loader, typed config, fs watch + reload ([spec §5](docs/upstream-spec.md#5-workflow-specification-repository-contract), [§6](docs/upstream-spec.md#6-configuration-specification)) |
+| `src/tracker/` | Linear GraphQL client, payload normalization ([spec §11](docs/upstream-spec.md#11-issue-tracker-integration-contract-linear-compatible)) |
 | `src/tracker/tracker.ts` | `IssueTracker` interface — pluggable tracker abstraction |
-| `src/workspace/` | Per-issue directory management, lifecycle hooks (spec §9) |
-| `src/agent/` | `AgentRunner` interface + Claude adapter; prompt builder; MCP config (spec §10) |
+| `src/workspace/` | Per-issue directory management, lifecycle hooks ([spec §9](docs/upstream-spec.md#9-workspace-management-and-safety)) |
+| `src/agent/` | `AgentRunner` interface + Claude adapter; prompt builder; MCP config ([spec §10](docs/upstream-spec.md#10-agent-runner-protocol-coding-agent-integration)) |
 | `src/guardrails/` | Cost-cap middleware |
 | `src/audit/` | Postgres audit writer + schema (`run_audit`, `issue_metadata`, `webhook_dedup`) |
 | `src/observability/` | Pino structured logger + Slack thread-card observer |
@@ -105,7 +105,7 @@ The heavy lifting (running tests, opening PRs, iterating on bot reviews) happens
 | `AGENTS.md` | Rules for AI agents working on this codebase + Symphony-driven prompt recognition |
 | `docker/Dockerfile` | Multi-stage build |
 | `scripts/` | `dev.sh`, `migrate.sh` |
-| `tests/` | Unit + conformance (spec §17) + integration |
+| `tests/` | Unit + conformance ([spec §17](docs/upstream-spec.md#17-test-and-validation-matrix)) + integration |
 
 ## Getting started
 
