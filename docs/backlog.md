@@ -37,6 +37,23 @@ Format per item:
   - _Labels:_ architecture, tracker-agnostic
   - _File(s):_ `src/tracker/tracker.ts`, `src/agents/*/index.ts`
 
+- [ ] Resolve the inert `codex` config block under the Claude runtime
+  - _Why:_ Symphony ships only the Claude adapter (`agentRuntime.runtime` is a
+    `z.literal("claude")`, see Deviation #11), but `WORKFLOW.md` still accepts
+    the spec's full `codex` block (§5.3.6). Only `codex.turn_timeout_ms` /
+    `codex.stall_timeout_ms` are consumed (by the orchestrator); the
+    Codex-specific fields (`command`, `approval_policy`, `thread_sandbox`,
+    `turn_sandbox_policy`) are silently ignored — misleading for operators.
+    Decide one of: (a) move the consumed timeouts under `agentRuntime`,
+    (b) widen `runtime` to `z.enum(["claude", "codex"])` when the Codex adapter
+    lands, or (c) document the block as Codex-only. Also: the in-code note at
+    `src/workflow/config.ts:232` points to a private `IMPROVEMENTS.md`
+    (`S-D8` / `A-6`) that does not exist in this repo — replace with a public
+    reference (same cleanup class as the `B-X` / `AGENT-520` refs below).
+  - _Labels:_ architecture, spec-conformance, cleanup
+  - _File(s):_ `src/workflow/config.ts:188`, `src/workflow/config.ts:232`,
+    `src/orchestrator/orchestrator.ts:514`
+
 - [ ] Make `SYMPHONY_SELF_PATH_FRAGMENT` configurable
   - _Why:_ Currently hardcoded to `sep+independent+sep+symphony+sep` — a
     monorepo path that is a no-op in standalone deployments (the workspace

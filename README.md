@@ -186,6 +186,7 @@ See [`docs/deploying.md`](docs/deploying.md) for Docker Compose and Cloud Run qu
 8. **Postgres-backed per-issue metadata.** Linear's GraphQL API doesn't expose user-defined per-issue custom fields. Symphony backs the 7 iteration/cost counters with `symphony.issue_metadata`.
 9. **HMAC webhook defense.** The webhook receiver validates `Linear-Signature` + ±60s freshness + DeliveryId dedupe.
 10. **Cooperative Linear GitHub auto-state.** Sub-issues move "Implementation (manual)" → "Pull request" on PR push and → "Done" on PR merge via Linear's native GitHub integration. Requires per-team `gitAutomationStateCreate` setup.
+11. **Claude coding agent instead of Codex.** The spec targets the Codex app-server (§3.3, §10) and names the agent runtime config the `codex` block (§5.3.6). Symphony ships a Claude adapter (`src/agent/claude-adapter.ts`) behind the spec's `AgentRunner` interface ([§10](docs/upstream-spec.md#10-agent-runner-protocol-coding-agent-integration)); `agentRuntime.runtime` is locked to the `"claude"` literal and no Codex adapter exists. The audit/token model is agent-neutral (`input_tokens` / `output_tokens`, not the spec's `codex_*`). The `codex` config block is still accepted in `WORKFLOW.md`: the orchestrator consumes its `turn_timeout_ms` / `stall_timeout_ms`, while Codex-specific fields (`command`, `approval_policy`, sandbox modes) are inert under the Claude runtime.
 
 ## License
 
