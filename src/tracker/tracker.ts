@@ -69,6 +69,44 @@ export interface IssueTracker {
   /** Return all direct children of a parent issue. Used by cascade modules. */
   fetchChildIssues(parentId: string): Promise<ChildIssue[]>;
 
+  // --- sub-ticketing extensions (A-19 / E-12) ---
+  //
+  // The orchestrator's post-Plan sub-ticket fan-out and the technical-plan
+  // re-plan path call these through the `IssueTracker` type. They were
+  // originally Linear-specific (hence the `linear_*` error codes in
+  // `LinearTrackerClient`), but lifting them here lets an alternate tracker
+  // (e.g. the in-memory `MemoryTracker`) drive the same decomposition flow.
+
+  /**
+   * Create a child issue under `parentId`, inheriting the parent's team and
+   * (via `labelIds`) its label taxonomy. `priority` mirrors the tracker's
+   * enum; pass null/undefined for the team default. Throws on failure.
+   */
+  createIssue(args: {
+    teamId: string;
+    title: string;
+    description: string;
+    parentId?: string | null;
+    priority?: number | null;
+    labelIds?: readonly string[];
+  }): Promise<{ id: string; identifier: string; url: string }>;
+
+  /**
+   * Resolve normalized (lowercase) label names into tracker label ids so a
+   * sub-ticket inherits its parent's taxonomy. Unknown names are skipped;
+   * returns an empty array when there's nothing to resolve.
+   */
+  resolveLabelIds(lowercaseNames: readonly string[]): Promise<string[]>;
+
+  /** Expose the configured team id so callers can pass it to `createIssue`. Null when unset. */
+  getTeamId(): string | null;
+
+  /** Soft-archive an issue (re-plan path). Throws on failure. */
+  archiveIssue(issueId: string): Promise<void>;
+
+  /** Update an issue's description in-place (re-plan path). Throws on failure. */
+  updateIssueDescription(issueId: string, description: string): Promise<void>;
+
   // --- bot identity ---
 
   /**

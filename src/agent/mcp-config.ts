@@ -1,7 +1,8 @@
 import { logger } from "../observability/logger.js";
 import { getInstallationToken } from "../lib/github-auth.js";
 import { buildLinearMcpServer } from "./linear-mcp.js";
-import type { LinearTrackerClient } from "../tracker/linear.js";
+import { isAgentToolProvider } from "./agent-tool-provider.js";
+import type { IssueTracker } from "../tracker/tracker.js";
 
 /**
  * MCP server configuration builder.
@@ -45,11 +46,14 @@ export interface BuildMcpServersOptions {
   /** When true, skip GH installation-token mint (tests). */
   skipGithub?: boolean;
   /**
-   * A-12: when set, attaches the in-process `linear_graphql` MCP tool
-   * (spec §10.5). Reuses Symphony's configured tracker auth so the
-   * agent never reads `LINEAR_API_KEY` directly.
+   * A-12: when set AND the tracker satisfies `isAgentToolProvider`, attaches
+   * the in-process `linear_graphql` MCP tool (spec §10.5). Reuses Symphony's
+   * configured tracker auth so the agent never reads `LINEAR_API_KEY`
+   * directly. Typed as the base `IssueTracker` (decision 1c) — a tracker with
+   * no agent tooling (e.g. `MemoryTracker`) is recognized by the guard and
+   * the tool is omitted with no error.
    */
-  tracker?: LinearTrackerClient;
+  tracker?: IssueTracker;
 }
 
 /**
@@ -75,7 +79,11 @@ export async function buildMcpServers(
   // for high-level Linear operations (issue creation, label CRUD, etc.);
   // this in-process tool gives the agent a raw GraphQL escape hatch when
   // the high-level MCP doesn't expose the field it needs.
-  if (opts.tracker) {
+  if (isAgentToolProvider(opts.tracker)) {
+    // Gate on the AgentToolProvider capability (decision 1c): only a tracker
+    // that exposes `runGraphqlForAgent` gets the in-process tool. A tracker
+    // without it (e.g. MemoryTracker) is omitted here with no error.
+    //
     // `buildLinearMcpServer` returns the SDK's `{type: "sdk", name, instance}`
     // envelope already (instance is a real McpServer). DO NOT wrap it again
     // — wrapping was the bug that crashed every dispatch with

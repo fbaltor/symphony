@@ -54,7 +54,7 @@ const baseConfig: SymphonyConfig = {
   guardrails: { dailyCapUsd: 250, perIssueCapUsd: 30, perStateCapUsd: {} },
   slack: { enabled: true, channelId: "C0123456789" },
   agentRuntime: { runtime: "claude", model: "claude-opus-4-7" },
-  github: { owner: "example-org", repo: "example-repo" },
+  github: { owner: "example-org", repo: "example-repo", branchPrefix: "symphony" },
 };
 
 describe("preflightValidate", () => {

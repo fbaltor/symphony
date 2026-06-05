@@ -19,7 +19,7 @@
 
 import { z } from "zod";
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
-import type { LinearTrackerClient } from "../tracker/linear.js";
+import type { AgentToolProvider } from "./agent-tool-provider.js";
 import { logger } from "../observability/logger.js";
 
 /**
@@ -52,7 +52,7 @@ const linearGraphqlSchema = z.object(linearGraphqlInputShape);
  * `agent/mcp-config.ts`) drop it into the SDK's `mcpServers` option as-is.
  */
 export function buildLinearMcpServer(
-  tracker: LinearTrackerClient,
+  tracker: AgentToolProvider,
 ): ReturnType<typeof createSdkMcpServer> {
   return createSdkMcpServer({
     name: "linear",

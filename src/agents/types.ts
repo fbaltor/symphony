@@ -19,7 +19,7 @@
  */
 
 import type pg from "pg";
-import type { LinearTrackerClient } from "../tracker/linear.js";
+import type { IssueTracker } from "../tracker/tracker.js";
 import type { Issue } from "../types.js";
 
 /**
@@ -43,12 +43,12 @@ export interface SpecialistContext {
   /** Postgres pool for issue_metadata reads/writes. */
   pool: pg.Pool;
   /**
-   * Tracker client. Typed as `LinearTrackerClient` because specialist agents
-   * use Linear-specific extensions (`createIssue`, `archiveIssue`, etc.) for
-   * sub-ticket filing and re-planning. Once those operations are lifted into
-   * `IssueTracker`, this can be narrowed to the base interface.
+   * Tracker client. Typed as the base `IssueTracker` interface — the
+   * sub-ticketing extensions specialists use (`createIssue`, `archiveIssue`,
+   * `resolveLabelIds`, etc.) now live on `IssueTracker`, so an alternate
+   * tracker (e.g. the in-memory `MemoryTracker`) satisfies this contract.
    */
-  tracker: LinearTrackerClient;
+  tracker: IssueTracker;
   /**
    * Workspace path on disk where the cloned monorepo lives. Specialists
    * don't write files (per WORKFLOW.staging.md `write_cwds_by_state: []`),

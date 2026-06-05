@@ -2,7 +2,7 @@ import type pg from "pg";
 import type { Issue } from "../types.js";
 import { renderPrompt } from "../workflow/template.js";
 import { findSpecialist } from "../agents/index.js";
-import type { LinearTrackerClient } from "../tracker/linear.js";
+import type { IssueTracker } from "../tracker/tracker.js";
 import { logger } from "../observability/logger.js";
 
 /**
@@ -79,7 +79,7 @@ export async function buildSpecialistPrompt(args: {
   attempt: number | null;
   comments: PromptComment[];
   pool: pg.Pool;
-  tracker: LinearTrackerClient;
+  tracker: IssueTracker;
   /**
    * The real cloned-monorepo workspace path the agent will run in. This gets
    * inlined into the user message — e.g. Technical plan's prompt tells the

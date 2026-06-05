@@ -88,7 +88,7 @@ function makeConfig(): SymphonyConfig {
     },
     slack: { enabled: false, channelId: null },
     agentRuntime: { runtime: "claude" },
-    github: { owner: "example-org", repo: "example-repo" },
+    github: { owner: "example-org", repo: "example-repo", branchPrefix: "symphony" },
   } satisfies SymphonyConfig;
 }
 
