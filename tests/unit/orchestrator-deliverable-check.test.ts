@@ -6,6 +6,11 @@ import type { WorkflowSnapshot, WorkflowWatcher } from "../../src/workflow/watch
 import type { LinearTrackerClient } from "../../src/tracker/linear.js";
 import type { AgentRunner } from "../../src/agent/runner.js";
 import type { SlackObserver } from "../../src/observability/slack.js";
+import {
+  MemoryAuditSink,
+  MemoryBudgetStore,
+  MemoryMetadataStore,
+} from "../../src/audit/store-memory.js";
 
 /**
  * Regression suite for the AGENT-441 / AGENT-439 false-positive Code Review
@@ -115,6 +120,9 @@ function makeOrchestrator(config: SymphonyConfig): {
     watcher,
     tracker: tracker as unknown as LinearTrackerClient,
     runner: {} as unknown as AgentRunner,
+    store: new MemoryMetadataStore(),
+    audit: new MemoryAuditSink(),
+    budget: new MemoryBudgetStore(),
     pool: {} as unknown as OrchestratorDeps["pool"],
     slack: {} as unknown as SlackObserver,
   };

@@ -12,14 +12,13 @@
  *
  * The build only exercises the state→specialist routing — `Specialist.run()`
  * is still a stub for all four specialists, so we don't need a live
- * Postgres pool here. We pass `undefined as unknown as pg.Pool` as a
+ * metadata store here. We pass `undefined as unknown as MetadataStore` as a
  * sentinel because the specialists' `buildUserMessage` doesn't touch the
- * pool during prompt construction (verified by reading each module's
+ * store during prompt construction (verified by reading each module's
  * prompt.ts — only PR validation MIGHT read it, and falls back to a
  * placeholder string when the iteration counter isn't on `ctx.extra`).
  */
 
-import type pg from "pg";
 import { describe, expect, it } from "vitest";
 
 import prioritized from "../../src/agents/prioritized/index.js";
@@ -30,6 +29,7 @@ import { findSpecialist, SPECIALISTS } from "../../src/agents/index.js";
 import { buildSpecialistPrompt } from "../../src/agent/prompt.js";
 import type { Issue } from "../../src/types.js";
 import type { LinearTrackerClient as LinearTracker } from "../../src/tracker/linear.js";
+import type { MetadataStore } from "../../src/audit/store.js";
 
 function fakeIssue(state: string): Issue {
   return {
@@ -49,11 +49,11 @@ function fakeIssue(state: string): Issue {
 }
 
 // `buildSpecialistPrompt` documents that none of the four specialists' build
-// functions actually call methods on the pool / tracker during prompt
+// functions actually call methods on the store / tracker during prompt
 // construction. We assert that contract by passing nullish stubs cast to
 // the expected types — if a future change adds a synchronous DB read, this
 // test fails with a clear NPE pointing at the offending specialist.
-const FAKE_POOL = undefined as unknown as pg.Pool;
+const FAKE_STORE = undefined as unknown as MetadataStore;
 const FAKE_TRACKER = undefined as unknown as LinearTracker;
 
 describe("§8 specialist registry — findSpecialist", () => {
@@ -102,7 +102,7 @@ describe("§8 buildSpecialistPrompt — first-turn rendering", () => {
       issue: fakeIssue("Prioritized"),
       attempt: null,
       comments: [],
-      pool: FAKE_POOL,
+      store: FAKE_STORE,
       tracker: FAKE_TRACKER,
       workspacePath: "/tmp/test-workspace",
     });
@@ -120,7 +120,7 @@ describe("§8 buildSpecialistPrompt — first-turn rendering", () => {
       issue: fakeIssue("Backlog"),
       attempt: null,
       comments: [],
-      pool: FAKE_POOL,
+      store: FAKE_STORE,
       tracker: FAKE_TRACKER,
       workspacePath: "/tmp/test-workspace",
     });
@@ -133,7 +133,7 @@ describe("§8 buildSpecialistPrompt — first-turn rendering", () => {
       issue: fakeIssue("Done"),
       attempt: null,
       comments: [],
-      pool: FAKE_POOL,
+      store: FAKE_STORE,
       tracker: FAKE_TRACKER,
       workspacePath: "/tmp/test-workspace",
     });
@@ -146,7 +146,7 @@ describe("§8 buildSpecialistPrompt — first-turn rendering", () => {
       issue: fakeIssue("RELEASE"),
       attempt: null,
       comments: [],
-      pool: FAKE_POOL,
+      store: FAKE_STORE,
       tracker: FAKE_TRACKER,
       workspacePath: "/tmp/test-workspace",
     });

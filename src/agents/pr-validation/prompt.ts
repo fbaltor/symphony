@@ -32,7 +32,7 @@
 
 import type { SpecialistContext } from "../types.js";
 import { getSection } from "../../lib/section-manager.js";
-import { getIssueMetadata, PR_VALIDATION_ITERATION_CAP } from "../../audit/issue-metadata.js";
+import { PR_VALIDATION_ITERATION_CAP } from "../../audit/issue-metadata.js";
 
 /**
  * Multi-paragraph SYSTEM_PROMPT. Sent verbatim to the SDK as the system role.
@@ -173,7 +173,7 @@ export const SYSTEM_PROMPT = [
  * user message reflects the current issue + current iteration counter.
  */
 export function buildUserMessage(ctx: SpecialistContext): string {
-  const { issue, workspacePath, pool } = ctx;
+  const { issue, workspacePath, store } = ctx;
 
   // Extract Scope / Exit criteria from the sub-issue description so the agent
   // doesn't have to re-fetch the issue body. These sections are written by
@@ -200,9 +200,9 @@ export function buildUserMessage(ctx: SpecialistContext): string {
       ? `${stashedIter + 1}`
       : "(orchestrator did not stash the counter; query symphony.issue_metadata if you need the exact value)";
 
-  // Avoid an unused-binding lint: `pool` is part of the documented contract,
+  // Avoid an unused-binding lint: `store` is part of the documented contract,
   // and downstream implementations will use it for the iteration read.
-  void pool;
+  void store;
 
   const lines = [
     `# PR validation turn for ${issue.identifier} — ${issue.title}`,
@@ -261,6 +261,6 @@ export function buildUserMessage(ctx: SpecialistContext): string {
 export async function readPrValidationIteration(
   ctx: SpecialistContext,
 ): Promise<number> {
-  const meta = await getIssueMetadata(ctx.pool, ctx.issue.id);
+  const meta = await ctx.store.getIssueMetadata(ctx.issue.id);
   return meta?.prValidationIteration ?? 0;
 }

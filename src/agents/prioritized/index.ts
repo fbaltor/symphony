@@ -27,7 +27,6 @@ import {
   type SpecialistResult,
   getPromptVersion,
 } from "../types.js";
-import { recordSpecialistRun } from "../../audit/issue-metadata.js";
 import { SYSTEM_PROMPT, buildUserMessage } from "./prompt.js";
 
 /**
@@ -55,7 +54,7 @@ const prioritized: Specialist = {
    * this body with the real LLM-driven implementation.
    */
   async run(ctx: SpecialistContext): Promise<SpecialistResult> {
-    await recordSpecialistRun(ctx.pool, {
+    await ctx.store.recordSpecialistRun({
       issueId: ctx.issue.id,
       issueIdentifier: ctx.issue.identifier,
       specialist: NAME,

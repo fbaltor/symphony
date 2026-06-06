@@ -16,6 +16,8 @@ import technicalPlanSpecialist, {
   buildUserMessage,
 } from "../../src/agents/technical-plan/index.js";
 import type { SpecialistContext } from "../../src/agents/types.js";
+import type { MetadataStore } from "../../src/audit/store.js";
+import { PostgresMetadataStore } from "../../src/audit/store-postgres.js";
 import type { LinearTrackerClient as LinearTracker } from "../../src/tracker/linear.js";
 import type { Issue } from "../../src/types.js";
 
@@ -59,9 +61,9 @@ function makeIssue(overrides: Partial<Issue> = {}): Issue {
 }
 
 function makeContext(overrides: Partial<SpecialistContext> = {}): SpecialistContext {
-  // The Pool / tracker are only consulted by run(); prompt-builder tests don't
+  // The store / tracker are only consulted by run(); prompt-builder tests don't
   // touch them. Cast through unknown so the test fixtures stay shallow.
-  const fakePool = {} as unknown as pg.Pool;
+  const fakeStore = {} as unknown as MetadataStore;
   const fakeTracker = {} as unknown as LinearTracker;
   const noopLogger = {
     info: () => {},
@@ -72,7 +74,7 @@ function makeContext(overrides: Partial<SpecialistContext> = {}): SpecialistCont
   return {
     issue: makeIssue(),
     comments: [],
-    pool: fakePool,
+    store: fakeStore,
     tracker: fakeTracker,
     workspacePath: "/tmp/symphony/workspaces/stg-7",
     logger: noopLogger,
@@ -262,7 +264,7 @@ LIVE_SUITE("technical-plan run() (live Postgres)", () => {
     const ctx: SpecialistContext = {
       issue: makeIssue({ id: TEST_ISSUE_ID, identifier: TEST_IDENT }),
       comments: [],
-      pool,
+      store: new PostgresMetadataStore(pool),
       tracker: {} as unknown as LinearTracker,
       workspacePath: "/tmp/test-workspace",
       logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
@@ -286,7 +288,7 @@ LIVE_SUITE("technical-plan run() (live Postgres)", () => {
     const ctx: SpecialistContext = {
       issue: makeIssue({ id: TEST_ISSUE_ID, identifier: TEST_IDENT }),
       comments: [],
-      pool,
+      store: new PostgresMetadataStore(pool),
       tracker: {} as unknown as LinearTracker,
       workspacePath: "/tmp/test-workspace",
       logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },

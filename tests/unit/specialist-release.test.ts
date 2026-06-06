@@ -21,6 +21,8 @@ import {
   buildUserMessage,
 } from "../../src/agents/release/prompt.js";
 import type { SpecialistContext } from "../../src/agents/types.js";
+import type { MetadataStore } from "../../src/audit/store.js";
+import { PostgresMetadataStore } from "../../src/audit/store-postgres.js";
 import type { LinearTrackerClient as LinearTracker } from "../../src/tracker/linear.js";
 import type { Issue } from "../../src/types.js";
 
@@ -52,7 +54,7 @@ function makeCtx(
   const ctx: SpecialistContext & { extra?: Record<string, unknown> } = {
     issue: overrides.issue ?? makeIssue(),
     comments: overrides.comments ?? [],
-    pool: (overrides.pool ?? null) as unknown as pg.Pool,
+    store: (overrides.store ?? null) as unknown as MetadataStore,
     tracker: (overrides.tracker ?? null) as unknown as LinearTracker,
     workspacePath: overrides.workspacePath ?? "/tmp/symphony-workspace/STG-TEST-1",
     logger: overrides.logger ?? {
@@ -179,7 +181,7 @@ LIVE_SUITE("Release specialist — run() (live Postgres)", () => {
 
     const ctx = makeCtx({
       issue: makeIssue({ id: TEST_ISSUE_ID, identifier: TEST_ISSUE_IDENT }),
-      pool,
+      store: new PostgresMetadataStore(pool),
     });
 
     const result = await releaseSpecialist.run(ctx);

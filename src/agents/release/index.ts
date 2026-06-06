@@ -20,7 +20,6 @@
  *      is terminal and does NOT bump any per-stage iteration counter.
  */
 
-import { recordSpecialistRun } from "../../audit/issue-metadata.js";
 import {
   getPromptVersion,
   type Specialist,
@@ -43,9 +42,9 @@ export const RELEASE_STATE = "Release";
  * the red path.
  */
 async function runStub(ctx: SpecialistContext): Promise<SpecialistResult> {
-  const { issue, pool, logger } = ctx;
+  const { issue, store, logger } = ctx;
 
-  await recordSpecialistRun(pool, {
+  await store.recordSpecialistRun({
     issueId: issue.id,
     issueIdentifier: issue.identifier,
     specialist: RELEASE_SPECIALIST_NAME,

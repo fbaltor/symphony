@@ -26,6 +26,8 @@ import {
   getIssueMetadata,
 } from "../../src/audit/issue-metadata.js";
 import type { SpecialistContext } from "../../src/agents/types.js";
+import type { MetadataStore } from "../../src/audit/store.js";
+import { PostgresMetadataStore } from "../../src/audit/store-postgres.js";
 import type { Issue } from "../../src/types.js";
 
 // -----------------------------------------------------------------------------
@@ -96,8 +98,8 @@ describe("pr-validation specialist — prompt + module shape", () => {
       const ctx: SpecialistContext = {
         issue,
         comments: [],
-        // pool / tracker are unused by buildUserMessage; cast to keep TS happy.
-        pool: {} as unknown as pg.Pool,
+        // store / tracker are unused by buildUserMessage; cast to keep TS happy.
+        store: {} as unknown as MetadataStore,
         tracker: {} as unknown as SpecialistContext["tracker"],
         workspacePath: "/tmp/test-workspace",
         logger: {
@@ -204,7 +206,7 @@ SUITE("pr-validation specialist — run() against live Postgres", () => {
     return {
       issue,
       comments: [],
-      pool,
+      store: new PostgresMetadataStore(pool),
       tracker: {} as unknown as SpecialistContext["tracker"],
       workspacePath: "/tmp/test-workspace",
       logger: {

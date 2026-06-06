@@ -18,7 +18,6 @@
  *     deliverables.
  */
 
-import { recordSpecialistRun } from "../../audit/issue-metadata.js";
 import { getPromptVersion, type Specialist, type SpecialistContext, type SpecialistResult } from "../types.js";
 import { SYSTEM_PROMPT, buildUserMessage } from "./prompt.js";
 
@@ -32,7 +31,7 @@ const technicalPlanSpecialist: Specialist = {
     // Bump plan_iteration even on the stub turn so re-plan accounting is
     // correct from day one. recordSpecialistRun is best-effort and swallows
     // its own errors.
-    await recordSpecialistRun(ctx.pool, {
+    await ctx.store.recordSpecialistRun({
       issueId: ctx.issue.id,
       issueIdentifier: ctx.issue.identifier,
       specialist: "technical-plan",

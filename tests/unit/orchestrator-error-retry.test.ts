@@ -4,6 +4,11 @@ import { computeErrorBackoffMs, Orchestrator } from "../../src/orchestrator/orch
 import type { OrchestratorDeps } from "../../src/orchestrator/orchestrator.js";
 import type { SymphonyConfig } from "../../src/workflow/config.js";
 import type { Issue } from "../../src/types.js";
+import {
+  PostgresAuditSink,
+  PostgresBudgetStore,
+  PostgresMetadataStore,
+} from "../../src/audit/store-postgres.js";
 
 /**
  * Coverage:
@@ -172,6 +177,13 @@ function makeOrchestrator(opts: {
     watcher,
     tracker,
     runner,
+    // The error-retry path reads attempt-count + last-failure from the
+    // metadata store, which (Postgres impl) delegates to the same SQL the
+    // fake pool's query mock drives — so the mock's COUNT(*) /
+    // ORDER BY finished_at responses still flow through unchanged.
+    store: new PostgresMetadataStore(pool),
+    audit: new PostgresAuditSink(pool),
+    budget: new PostgresBudgetStore(pool),
     pool,
     slack,
   } as unknown as OrchestratorDeps;

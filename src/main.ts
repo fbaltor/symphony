@@ -9,7 +9,11 @@ import { createAgentRunner } from "./agent/runner-factory.js";
 import { buildMcpServers } from "./agent/mcp-config.js";
 import { Orchestrator } from "./orchestrator/orchestrator.js";
 import { createPool, shutdownPool } from "./audit/client.js";
-import { reapOrphanedRuns } from "./audit/writer.js";
+import {
+  PostgresAuditSink,
+  PostgresBudgetStore,
+  PostgresMetadataStore,
+} from "./audit/store-postgres.js";
 import { acquireInstanceLock } from "./singleton/instance-lock.js";
 import { SlackObserver } from "./observability/slack.js";
 import { handleHttpRequest } from "./observability/http-routes.js";
@@ -158,6 +162,15 @@ async function main(): Promise<void> {
     });
     poolRef = pool;
 
+    // Phase C (zero-dep E2E): construct the Postgres-backed stores once from
+    // the pool. They are EXACT thin wrappers over today's audit/guardrail
+    // functions, so the `kind=linear` profile behaves byte-for-byte as before.
+    // The orchestrator + specialists now depend on these interfaces instead of
+    // the raw pool; only the composition root (here) still sees `pg`.
+    const metadataStore = new PostgresMetadataStore(pool);
+    const auditSink = new PostgresAuditSink(pool);
+    const budgetStore = new PostgresBudgetStore(pool);
+
     lockHandle = await acquireInstanceLock(pool, {
       onHandoffRequested: () => {
         // AGENT-520: another Cloud Run revision is asking us to step down.
@@ -182,7 +195,7 @@ async function main(): Promise<void> {
     // acquired the lock; observability gap is recoverable on next
     // boot). Synchronous before orchestrator.start() so reaped rows
     // settle before the new instance starts dispatching.
-    const reaped = await reapOrphanedRuns(pool, lockHandle.instanceId);
+    const reaped = await auditSink.reapOrphanedRuns(lockHandle.instanceId);
     if (reaped > 0) {
       logger.warn({ reaped }, "boot: reaped orphaned running_runs from prior instance");
     }
@@ -239,6 +252,9 @@ async function main(): Promise<void> {
       watcher,
       tracker,
       runner,
+      store: metadataStore,
+      audit: auditSink,
+      budget: budgetStore,
       pool,
       slack,
       // Task 2 (2026-05-06): instance ID flows into the orchestrator so

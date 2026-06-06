@@ -28,8 +28,9 @@ export async function checkCaps(
   pool: pg.Pool,
   cfg: CostCapConfig,
   issueId: string,
+  at: Date = new Date(),
 ): Promise<CapDecision> {
-  const today = new Date();
+  const today = at;
   const [daily, perIssue] = await Promise.all([
     readBudget(pool, { kind: "daily", key: isoDateUtc(today) }, today),
     readBudget(pool, { kind: "issue", key: issueId }, today),
@@ -58,8 +59,9 @@ export async function recordCost(
   pool: pg.Pool,
   issueId: string,
   costUsd: number,
+  at: Date = new Date(),
 ): Promise<{ dailyUsed: number; perIssueUsed: number }> {
-  const today = new Date();
+  const today = at;
   const [dailyUsed, perIssueUsed] = await Promise.all([
     incrementBudget(pool, { kind: "daily", key: isoDateUtc(today) }, costUsd, today),
     incrementBudget(pool, { kind: "issue", key: issueId }, costUsd, today),

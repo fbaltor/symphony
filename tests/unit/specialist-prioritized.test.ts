@@ -19,6 +19,8 @@ import prioritized, { NAME, STATE } from "../../src/agents/prioritized/index.js"
 import { buildUserMessage, SYSTEM_PROMPT } from "../../src/agents/prioritized/prompt.js";
 import type { SpecialistContext } from "../../src/agents/types.js";
 import { getIssueMetadata } from "../../src/audit/issue-metadata.js";
+import type { MetadataStore } from "../../src/audit/store.js";
+import { PostgresMetadataStore } from "../../src/audit/store-postgres.js";
 import type { Issue } from "../../src/types.js";
 
 /**
@@ -44,9 +46,9 @@ function fakeIssue(overrides: Partial<Issue> = {}): Issue {
 }
 
 /**
- * Minimal SpecialistContext factory. The pool, tracker, and abortController
+ * Minimal SpecialistContext factory. The store, tracker, and abortController
  * fields are typed but never touched by buildUserMessage; we leave them as
- * `null as any` for the prompt-shape tests and only wire a real pg pool for
+ * `null as any` for the prompt-shape tests and only wire a real store for
  * the live-Postgres `run()` test below.
  */
 function fakeCtx(overrides: Partial<SpecialistContext> = {}): SpecialistContext {
@@ -59,7 +61,7 @@ function fakeCtx(overrides: Partial<SpecialistContext> = {}): SpecialistContext 
   return {
     issue: fakeIssue(),
     comments: [],
-    pool: null as unknown as pg.Pool,
+    store: null as unknown as MetadataStore,
     tracker: null as unknown as SpecialistContext["tracker"],
     workspacePath: "/tmp/symphony-workspaces/STG-9999",
     logger: noopLogger,
@@ -235,7 +237,7 @@ SUITE("Prioritized specialist — live Postgres run() stub", () => {
 
   it("run() returns a Succeeded SpecialistResult with zero cost (Phase 2 stub)", async () => {
     const ctx = fakeCtx({
-      pool,
+      store: new PostgresMetadataStore(pool),
       issue: fakeIssue({ id: TEST_ISSUE_ID, identifier: TEST_ISSUE_IDENT }),
     });
     const result = await prioritized.run(ctx);
@@ -248,7 +250,7 @@ SUITE("Prioritized specialist — live Postgres run() stub", () => {
 
   it("run() bumps validation_iteration and stamps last_specialist=prioritized", async () => {
     const ctx = fakeCtx({
-      pool,
+      store: new PostgresMetadataStore(pool),
       issue: fakeIssue({ id: TEST_ISSUE_ID, identifier: TEST_ISSUE_IDENT }),
     });
     await prioritized.run(ctx);
@@ -262,7 +264,7 @@ SUITE("Prioritized specialist — live Postgres run() stub", () => {
 
   it("run() is incremental — two invocations bump the counter to 2", async () => {
     const ctx = fakeCtx({
-      pool,
+      store: new PostgresMetadataStore(pool),
       issue: fakeIssue({ id: TEST_ISSUE_ID, identifier: TEST_ISSUE_IDENT }),
     });
     await prioritized.run(ctx);

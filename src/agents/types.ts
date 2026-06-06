@@ -18,7 +18,7 @@
  * with its own `iterationKey` so the §8 / E-6 counters stay accurate.
  */
 
-import type pg from "pg";
+import type { MetadataStore } from "../audit/store.js";
 import type { IssueTracker } from "../tracker/tracker.js";
 import type { Issue } from "../types.js";
 
@@ -40,8 +40,13 @@ export interface SpecialistContext {
     createdAt: string;
     body: string;
   }>;
-  /** Postgres pool for issue_metadata reads/writes. */
-  pool: pg.Pool;
+  /**
+   * Metadata store for issue_metadata reads/writes. Abstracts the raw
+   * Postgres pool the specialists used to thread (Phase C) — the Postgres
+   * impl wraps the same functions, the in-memory impl backs the
+   * zero-dependency E2E profile.
+   */
+  store: MetadataStore;
   /**
    * Tracker client. Typed as the base `IssueTracker` interface — the
    * sub-ticketing extensions specialists use (`createIssue`, `archiveIssue`,

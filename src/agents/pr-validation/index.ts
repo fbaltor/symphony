@@ -23,12 +23,7 @@
 
 import type { Specialist, SpecialistContext, SpecialistResult } from "../types.js";
 import { getPromptVersion } from "../types.js";
-import {
-  PR_VALIDATION_ITERATION_CAP,
-  isPrValidationCapped,
-  recordSpecialistRun,
-  setErrorState,
-} from "../../audit/issue-metadata.js";
+import { PR_VALIDATION_ITERATION_CAP } from "../../audit/issue-metadata.js";
 import { SYSTEM_PROMPT, buildUserMessage } from "./prompt.js";
 
 const NAME = "pr-validation";
@@ -44,7 +39,7 @@ const prValidation: Specialist = {
     // 1. Cap gate. The cap is a soft fence per the metadata helper (best-
     //    effort writes), so we ALSO set error_state on Postgres so the
     //    orchestrator and the human triage queue agree on what happened.
-    const capped = await isPrValidationCapped(ctx.pool, ctx.issue.id);
+    const capped = await ctx.store.isPrValidationCapped(ctx.issue.id);
     if (capped) {
       ctx.logger.warn(
         {
@@ -57,7 +52,7 @@ const prValidation: Specialist = {
       // Mark the issue's error_state so /status + Slack lifecycle events can
       // surface why the issue is stuck. setErrorState is best-effort; a
       // failure here does not block the escalation outcome below.
-      await setErrorState(ctx.pool, {
+      await ctx.store.setErrorState({
         issueId: ctx.issue.id,
         issueIdentifier: ctx.issue.identifier,
         state: STATE,
@@ -96,7 +91,7 @@ const prValidation: Specialist = {
     //    leaves the counter inconsistent but is not load-bearing for
     //    correctness — the cap re-checks via isPrValidationCapped on the
     //    next dispatch.
-    await recordSpecialistRun(ctx.pool, {
+    await ctx.store.recordSpecialistRun({
       issueId: ctx.issue.id,
       issueIdentifier: ctx.issue.identifier,
       specialist: NAME,

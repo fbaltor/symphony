@@ -1,4 +1,4 @@
-import type pg from "pg";
+import type { PgPoolType } from "../audit/client.js";
 import { setTimeout as wait } from "node:timers/promises";
 import type { Issue, OrchestratorState, RetryEntry, RunningEntry } from "../types.js";
 import { logger, withContext } from "../observability/logger.js";
@@ -20,13 +20,9 @@ import {
 } from "../agent/prompt.js";
 import type { AgentRunner } from "../agent/runner.js";
 import { attachWorkspace } from "../agent/claude-adapter.js";
-import { recordRunEnd, recordRunStart, writeRunAudit } from "../audit/writer.js";
-import { recordSpecialistRun } from "../audit/issue-metadata.js";
+import type { AuditSink, BudgetStore, MetadataStore } from "../audit/store.js";
 import { findSpecialist } from "../agents/index.js";
 import { readGitSha } from "../lib/build-info.js";
-import { countAttemptsForIssue, lastFailedAtForIssue } from "../audit/queries.js";
-import { checkCaps, recordCost } from "../guardrails/cost-cap.js";
-import { readBudget } from "../guardrails/budget-state.js";
 import type { SlackObserver } from "../observability/slack.js";
 import { cancelTimer, nowMonotonicMs, scheduleTimer } from "../lib/time.js";
 import { sanitizeIdentifier } from "../lib/ids.js";
@@ -57,7 +53,24 @@ export interface OrchestratorDeps {
    */
   tracker: IssueTracker;
   runner: AgentRunner;
-  pool: pg.Pool;
+  /**
+   * Phase C abstraction. The orchestrator's domain logic (issue_metadata,
+   * run_audit, budget caps) goes through these store interfaces instead of a
+   * raw pool — the Postgres impls wrap today's functions unchanged, the
+   * in-memory impls back the zero-dependency E2E profile.
+   */
+  store: MetadataStore;
+  audit: AuditSink;
+  budget: BudgetStore;
+  /**
+   * Raw Postgres pool, still threaded for the seams NOT yet abstracted in
+   * Phase C: `ReviewGateStore`, the kill-switch read, `reconcileTrackerStates`
+   * (issue_state_actor lookup), and `runDevelopmentCascade`. These stay on the
+   * pool until later phases; the domain metadata/audit/budget paths no longer
+   * touch it. Typed via the `PgPoolType` alias so this domain module carries
+   * no direct `pg` import.
+   */
+  pool: PgPoolType;
   slack: SlackObserver;
   /**
    * Task 2 (2026-05-06): instance ID from `acquireInstanceLock`. Stored
@@ -865,7 +878,7 @@ export class Orchestrator {
       // settles.
       this.errorRetryInFlight.add(issue.id);
       try {
-        const attempts = await countAttemptsForIssue(this.deps.pool, issue.id);
+        const attempts = await this.deps.store.countAttemptsForIssue(issue.id);
         if (attempts > maxRetries) {
           await this.postBudgetExhaustedComment(issue, attempts).catch((err) =>
             logger.warn(
@@ -877,7 +890,7 @@ export class Orchestrator {
         }
 
         const delayMs = computeErrorBackoffMs(attempts);
-        const lastFailedAt = await lastFailedAtForIssue(this.deps.pool, issue.id);
+        const lastFailedAt = await this.deps.store.lastFailedAtForIssue(issue.id);
         if (lastFailedAt) {
           const elapsedMs = Date.now() - lastFailedAt.getTime();
           if (elapsedMs < delayMs) {
@@ -957,7 +970,11 @@ export class Orchestrator {
 
     // Cost-cap is enforced here (the central choke-point) so retries and
     // continuations are gated too — not just first-time dispatches from tick().
-    const cap = await checkCaps(this.deps.pool, this.currentConfig.guardrails, issue.id);
+    const cap = await this.deps.budget.checkCaps(
+      this.currentConfig.guardrails,
+      issue.id,
+      new Date(),
+    );
     if (!cap.allowed) {
       log.warn({ reason: cap.reason }, "dispatch rejected: cost cap exceeded");
       // B-8: rate-limited Slack alert (per-reason 5-min dampening) so a
@@ -1126,7 +1143,7 @@ export class Orchestrator {
     // block below runs (OOM, SIGKILL during scale-down, etc.). Skipped
     // when `instanceId` is unset (test / standalone runs).
     if (this.deps.instanceId) {
-      await recordRunStart(this.deps.pool, {
+      await this.deps.audit.recordRunStart({
         issueId: issue.id,
         issueIdentifier: issue.identifier,
         instanceId: this.deps.instanceId,
@@ -1181,7 +1198,7 @@ export class Orchestrator {
         issue,
         attempt,
         comments: priorComments,
-        pool: this.deps.pool,
+        store: this.deps.store,
         tracker: this.deps.tracker,
         // Pass the real workspace path through so the prompt's
         // `${ctx.workspacePath}` interpolation reflects the cloned-monorepo
@@ -1205,10 +1222,9 @@ export class Orchestrator {
       // for this turn (still active at dispatch via checkCaps). The cap
       // applies cumulatively across turns within a single runWorker too —
       // see the continuation loop below.
-      const issueBudgetAtStart = await readBudget(this.deps.pool, {
-        kind: "issue",
-        key: issue.id,
-      }).catch(() => 0);
+      const issueBudgetAtStart = await this.deps.budget
+        .readBudget({ kind: "issue", key: issue.id }, new Date())
+        .catch(() => 0);
       const firstResult = await this.deps.runner.runTurn(session, {
         prompt: firstPrompt,
         attempt,
@@ -1341,7 +1357,7 @@ export class Orchestrator {
       // so the orphan reaper on the next boot doesn't false-positive
       // synthetic Killed rows for runs that completed normally.
       if (this.deps.instanceId) {
-        await recordRunEnd(this.deps.pool, {
+        await this.deps.audit.recordRunEnd({
           issueId: issue.id,
           instanceId: this.deps.instanceId,
         });
@@ -1369,10 +1385,10 @@ export class Orchestrator {
       this.state.totals.secondsRunning += (finishedAtUtc.getTime() - startedAtUtc.getTime()) / 1000;
       this.state.totals.costUsd += totalCost;
 
-      await recordCost(this.deps.pool, issue.id, totalCost).catch((err) =>
+      await this.deps.budget.recordCost(issue.id, totalCost, new Date()).catch((err) =>
         logger.warn({ err: (err as Error).message }, "recordCost failed; continuing"),
       );
-      await writeRunAudit(this.deps.pool, {
+      await this.deps.audit.writeRunAudit({
         issueId: issue.id,
         issueIdentifier: issue.identifier,
         attempt,
@@ -1422,7 +1438,7 @@ export class Orchestrator {
               : specialist.name === "pr-validation"
                 ? ("pr_validation" as const)
                 : null; // release: cumulative cost only, no counter
-        await recordSpecialistRun(this.deps.pool, {
+        await this.deps.store.recordSpecialistRun({
           issueId: issue.id,
           issueIdentifier: issue.identifier,
           specialist: specialist.name,

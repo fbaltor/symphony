@@ -15,6 +15,11 @@ import type {
 } from "../../src/agent/runner.js";
 import type { AgentEvent } from "../../src/agent/events.js";
 import type { SlackObserver } from "../../src/observability/slack.js";
+import {
+  PostgresAuditSink,
+  PostgresBudgetStore,
+  PostgresMetadataStore,
+} from "../../src/audit/store-postgres.js";
 
 /**
  * Phase A — tracker seam. A full poll→dispatch→transition→reconcile cycle
@@ -224,6 +229,12 @@ function makeHarness(args: {
 }): Harness {
   const tracker = new MemoryTracker(args.seed);
   const runner = args.runner ?? makeRunner();
+  // The fake pool returns empty result sets for every query; wrapping it in
+  // the Postgres-backed stores preserves the orchestrator's "no rows → caps
+  // inactive / budget 0 / kill-switch disengaged" degradation exactly, since
+  // those stores delegate to the same wrapped functions the orchestrator used
+  // to call directly.
+  const pool = makeFakePool();
   const deps: OrchestratorDeps = {
     watcher: makeWatcher(args.config),
     // The seam: assigning a MemoryTracker (typed IssueTracker) to the
@@ -231,7 +242,10 @@ function makeHarness(args: {
     // so this line is a compile error until the seam lands.
     tracker: tracker as IssueTracker,
     runner,
-    pool: makeFakePool(),
+    store: new PostgresMetadataStore(pool),
+    audit: new PostgresAuditSink(pool),
+    budget: new PostgresBudgetStore(pool),
+    pool,
     slack: makeSlack(),
   };
   const orchestrator = new Orchestrator(deps);

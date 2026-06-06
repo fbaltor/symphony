@@ -1,8 +1,8 @@
-import type pg from "pg";
 import type { Issue } from "../types.js";
 import { renderPrompt } from "../workflow/template.js";
 import { findSpecialist } from "../agents/index.js";
 import type { IssueTracker } from "../tracker/tracker.js";
+import type { MetadataStore } from "../audit/store.js";
 import { logger } from "../observability/logger.js";
 
 /**
@@ -64,7 +64,7 @@ export function buildContinuationGuidance(issue: Issue, turnIndex: number): stri
  * the LLM's, etc.). Specialists only read `issue` + `comments` (and in the
  * PR validation case a `__prValidationIteration` stash) during prompt
  * construction, so we synthesize a minimal context with stub values for the
- * unused fields. The pool + tracker are passed through verbatim so a
+ * unused fields. The store + tracker are passed through verbatim so a
  * future change that needs synchronous access (e.g. metadata read) doesn't
  * have to plumb args through `runWorker`.
  *
@@ -78,7 +78,7 @@ export async function buildSpecialistPrompt(args: {
   issue: Issue;
   attempt: number | null;
   comments: PromptComment[];
-  pool: pg.Pool;
+  store: MetadataStore;
   tracker: IssueTracker;
   /**
    * The real cloned-monorepo workspace path the agent will run in. This gets
@@ -97,13 +97,13 @@ export async function buildSpecialistPrompt(args: {
   if (!specialist) return null;
 
   // Synthesize a SpecialistContext from the worker-provided workspacePath.
-  // The pool / tracker / abortController fields exist on the context type
+  // The store / tracker / abortController fields exist on the context type
   // but aren't read by buildUserMessage (only by specialist.run() later);
   // they're plumbed for type-shape parity with the run-time context.
   const ctx = {
     issue: args.issue,
     comments: args.comments,
-    pool: args.pool,
+    store: args.store,
     tracker: args.tracker,
     workspacePath: args.workspacePath,
     logger: {
