@@ -38,21 +38,58 @@ Format per item:
   - _File(s):_ `src/tracker/tracker.ts`, `src/agents/*/index.ts`
 
 - [ ] Resolve the inert `codex` config block under the Claude runtime
-  - _Why:_ Symphony ships only the Claude adapter (`agentRuntime.runtime` is a
-    `z.literal("claude")`, see Deviation #11), but `WORKFLOW.md` still accepts
-    the spec's full `codex` block (§5.3.6). Only `codex.turn_timeout_ms` /
-    `codex.stall_timeout_ms` are consumed (by the orchestrator); the
-    Codex-specific fields (`command`, `approval_policy`, `thread_sandbox`,
-    `turn_sandbox_policy`) are silently ignored — misleading for operators.
-    Decide one of: (a) move the consumed timeouts under `agentRuntime`,
-    (b) widen `runtime` to `z.enum(["claude", "codex"])` when the Codex adapter
-    lands, or (c) document the block as Codex-only. Also: the in-code note at
+  - _Why:_ `WORKFLOW.md` still accepts the spec's full `codex` block (§5.3.6),
+    but only `codex.turn_timeout_ms` / `codex.stall_timeout_ms` are consumed (by
+    the orchestrator); the Codex-specific fields (`command`, `approval_policy`,
+    `thread_sandbox`, `turn_sandbox_policy`) are silently ignored — misleading
+    for operators. Decide one of: (a) move the consumed timeouts under
+    `agentRuntime`, (b) add a `codex` adapter + `"codex"` to the `runtime` enum,
+    or (c) document the block as Codex-only. Also: the in-code note at
     `src/workflow/config.ts:232` points to a private `IMPROVEMENTS.md`
     (`S-D8` / `A-6`) that does not exist in this repo — replace with a public
     reference (same cleanup class as the `B-X` / `AGENT-520` refs below).
+  - _Note:_ `agentRuntime.runtime` is now `z.enum(["claude", "fake"])` (was
+    `z.literal("claude")`), so the enum-widening mechanism for (b) already
+    exists — adding `"codex"` is an extension, not a refactor. See Deviation #11.
   - _Labels:_ architecture, spec-conformance, cleanup
   - _File(s):_ `src/workflow/config.ts:188`, `src/workflow/config.ts:232`,
     `src/orchestrator/orchestrator.ts:514`
+
+- [ ] Verify the in-memory stores/lock against Postgres (close the by-construction gap)
+  - _Why:_ The `kind: memory` profile (Deviation #12) asserts the memory
+    `MetadataStore`/`AuditSink`/`BudgetStore` equivalence to the Postgres impls
+    **by construction**, not by running the same contract against both. The
+    `*Contract(makeStore)` suites in `tests/unit/store-contract.test.ts` are
+    already parameterized for reuse — wire them against the Postgres impls in a
+    `DATABASE_URL`-gated integration test to make behavior-preservation
+    *verified*. Would also catch the unguarded divergences below.
+  - _Labels:_ testing, spec-conformance
+  - _File(s):_ `tests/unit/store-contract.test.ts`, `src/audit/store-postgres.ts`
+
+- [ ] `PostgresAuditSink.listRunAudits()` omits the `extra` column
+  - _Why:_ The new `listRunAudits()` SELECT drops `run_audit.extra`, so a row
+    round-tripped write→list loses `extra`. New, untested (no production caller
+    yet — only the memory impl runs in the contract suite). Add `extra` to the
+    projection, or pin the round-trip once a DB/integration test exists.
+  - _Labels:_ cleanup
+  - _File(s):_ `src/audit/store-postgres.ts`
+
+- [ ] Real cross-process advisory-lock race needs a Postgres integration test
+  - _Why:_ `MemoryInstanceLock` (decision 2b) simulates lease/heartbeat in one
+    process (non-blocking `acquire()→null`), so it cannot reproduce the real
+    cross-process rolling-deploy race the Postgres `acquireInstanceLock`
+    guards against. That coverage still belongs in a `DATABASE_URL`-gated test.
+  - _Labels:_ testing
+  - _File(s):_ `src/singleton/lock.ts`, `src/singleton/instance-lock.ts`
+
+- [ ] `memory`+`claude` profile wires no `mcpServersResolver`
+  - _Why:_ `buildDeps` passes a per-turn `mcpServersResolver` to the Claude
+    runner only on the `linear` branch (`src/deps.ts`), not the `memory` branch.
+    Harmless today (the memory profile is for the fake runner; behavior-2 only
+    asserts construction), but a real turn under `kind: memory` + `runtime:
+    claude` would have no MCP tools. Wire it if that combination is ever used.
+  - _Labels:_ cleanup
+  - _File(s):_ `src/deps.ts`
 
 - [ ] Make `SYMPHONY_SELF_PATH_FRAGMENT` configurable
   - _Why:_ Currently hardcoded to `sep+independent+sep+symphony+sep` — a
