@@ -5,7 +5,7 @@ import { logger } from "./observability/logger.js";
 import { WorkflowError } from "./workflow/loader.js";
 import { WorkflowWatcher } from "./workflow/watch.js";
 import { LinearTrackerClient } from "./tracker/linear.js";
-import { ClaudeAgentRunner } from "./agent/claude-adapter.js";
+import { createAgentRunner } from "./agent/runner-factory.js";
 import { buildMcpServers } from "./agent/mcp-config.js";
 import { Orchestrator } from "./orchestrator/orchestrator.js";
 import { createPool, shutdownPool } from "./audit/client.js";
@@ -214,19 +214,20 @@ async function main(): Promise<void> {
       );
     }
 
-    // `cfg.agentRuntime.runtime` is `z.literal("claude")` after A-6
-    // tightened the schema — invalid values now fail at WorkflowWatcher.start
-    // with a structured zod error instead of this runtime throw.
-    const runner = new ClaudeAgentRunner({
-      model: cfg.agentRuntime.model,
-      // A-10: forward agent_runtime.effort if WORKFLOW.md sets it.
-      effort: cfg.agentRuntime.effort,
-      // Re-resolve MCP servers per turn so freshly minted GitHub App
-      // tokens (1h expiry) are used. `buildMcpServers` reads from
-      // process.env so the env-injected secrets in Cloud Run flow through.
-      // A-12: pass tracker so the in-process `linear_graphql` tool can
-      // reuse Symphony's configured Linear auth.
-      mcpServersResolver: () => buildMcpServers({ tracker }),
+    // Phase B (zero-dep E2E): `cfg.agentRuntime.runtime` is now
+    // `z.enum(["claude", "fake"])` — the factory maps it to the real Claude
+    // adapter (default) or the scripted FakeAgentRunner without changing this
+    // call site. Invalid values fail at WorkflowWatcher.start with a
+    // structured zod error. `model` / `effort` flow from config inside the
+    // factory; the Claude-only per-turn MCP resolver is passed as an override.
+    //
+    // A-10: agent_runtime.effort forwarded if WORKFLOW.md sets it.
+    // Re-resolve MCP servers per turn so freshly minted GitHub App tokens (1h
+    // expiry) are used. `buildMcpServers` reads from process.env so the
+    // env-injected secrets in Cloud Run flow through. A-12: pass tracker so
+    // the in-process `linear_graphql` tool can reuse Symphony's Linear auth.
+    const runner = createAgentRunner(cfg, {
+      claude: { mcpServersResolver: () => buildMcpServers({ tracker }) },
     });
 
     const slackChannelResolved = cfg.slack.channelId ?? slackChannel ?? undefined;

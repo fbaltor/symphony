@@ -229,10 +229,12 @@ const slackSchema = z
   })
   .default({ enabled: true });
 
-// Only the `claude` runtime adapter ships in this version. The Codex
-// adapter (spec §10) is a follow-up PR — see IMPROVEMENTS.md S-D8 / A-6.
-// When Codex lands, widen the literal to `z.enum(["claude", "codex"])`
-// and reintroduce a runtime switch in the orchestrator.
+// Two runtimes ship: the real `claude` adapter (default) and the scripted
+// `fake` runner (zero-LLM-cost, deterministic — used by the `kind: memory`
+// E2E profile; see runner-factory.ts + plan §3 "Agent axis stays
+// independent"). The Codex adapter (spec §10) is still a follow-up PR — see
+// IMPROVEMENTS.md S-D8 / A-6; when it lands, add it to this enum and
+// reintroduce a runtime switch in the orchestrator.
 //
 // A-10: `model` is now non-empty-string-validated (was `optional` only —
 // allowed misconfigured `model: ""` to slip through and fall back to SDK
@@ -241,7 +243,7 @@ const slackSchema = z
 // 2026 SDK features. Omitting it preserves the SDK's own default.
 const agentRuntimeSchema = z
   .object({
-    runtime: z.literal("claude").default("claude"),
+    runtime: z.enum(["claude", "fake"]).default("claude"),
     model: z.string().min(1).optional(),
     effort: z.enum(["low", "medium", "high", "max"]).optional(),
   })
