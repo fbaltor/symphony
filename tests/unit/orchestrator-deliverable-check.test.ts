@@ -11,6 +11,11 @@ import {
   MemoryBudgetStore,
   MemoryMetadataStore,
 } from "../../src/audit/store-memory.js";
+import {
+  type DeliverableSource,
+  MemoryDeliverableSource,
+} from "../../src/lib/deliverable-source.js";
+import type { GithubBranchSummary } from "../../src/lib/github.js";
 
 /**
  * Regression suite for the AGENT-441 / AGENT-439 false-positive Code Review
@@ -90,7 +95,10 @@ function fakeIssue(overrides?: Partial<Issue>): Issue {
   };
 }
 
-function makeOrchestrator(config: SymphonyConfig): {
+function makeOrchestrator(
+  config: SymphonyConfig,
+  deliverable: DeliverableSource = new MemoryDeliverableSource({ branches: [] }),
+): {
   orchestrator: Orchestrator;
   tracker: {
     createComment: ReturnType<typeof vi.fn>;
@@ -123,6 +131,12 @@ function makeOrchestrator(config: SymphonyConfig): {
     store: new MemoryMetadataStore(),
     audit: new MemoryAuditSink(),
     budget: new MemoryBudgetStore(),
+    // Phase D: the deliverable gate now reads branch / PR presence through an
+    // injected DeliverableSource instead of the module-level GitHub fetches.
+    // Tests seed a MemoryDeliverableSource with the same branches/PRs the
+    // old globalThis.fetch mock returned (default: empty branch list, which
+    // the prior `fetch` default also produced → exists=false).
+    deliverable,
     pool: {} as unknown as OrchestratorDeps["pool"],
     slack: {} as unknown as SlackObserver,
   };
@@ -140,8 +154,7 @@ function privateGate(o: Orchestrator): {
   deliverableGate: (issue: Issue, state: string) => Promise<{ allowed: boolean }>;
   checkDeliverableExists: (
     issue: Issue,
-    tokenProvider: () => Promise<string | null>,
-    branchFetcher: (token: string) => Promise<{ name: string; sha: string }[] | null>,
+    branchFetcher?: () => Promise<GithubBranchSummary[] | null>,
   ) => Promise<boolean | null>;
   noDeliverableCount: Map<string, number>;
 } {
@@ -149,8 +162,7 @@ function privateGate(o: Orchestrator): {
     deliverableGate: (issue: Issue, state: string) => Promise<{ allowed: boolean }>;
     checkDeliverableExists: (
       issue: Issue,
-      tokenProvider: () => Promise<string | null>,
-      branchFetcher: (token: string) => Promise<{ name: string; sha: string }[] | null>,
+      branchFetcher?: () => Promise<GithubBranchSummary[] | null>,
     ) => Promise<boolean | null>;
     noDeliverableCount: Map<string, number>;
   };
@@ -240,29 +252,27 @@ describe("orchestrator deliverable check", () => {
     expect(gate.noDeliverableCount.has(issue.id)).toBe(false);
   });
 
-  it("fails open when GH App token is missing (null tokenProvider)", async () => {
-    const { orchestrator, tracker } = makeOrchestrator(makeConfig());
+  it("fails open when the deliverable source is inconclusive (null branches)", async () => {
+    // Phase D: "no GH App token / transient 5xx" is now modelled by the
+    // injected DeliverableSource returning `null` (couldn't tell). Seed the
+    // orchestrator with that inconclusive seam and route the gate through it.
+    const { orchestrator, tracker } = makeOrchestrator(
+      makeConfig(),
+      new MemoryDeliverableSource({ branches: null }),
+    );
     const issue = fakeIssue();
     const gate = privateGate(orchestrator);
-    const result = await gate.checkDeliverableExists(
-      issue,
-      async () => null,
-      async () => null,
-    );
+    // With no branchFetcher override, checkDeliverableExists reads the injected
+    // (null) source → "couldn't tell".
+    const result = await gate.checkDeliverableExists(issue);
     expect(result).toBeNull();
-    // The gate should ALLOW because an inconclusive check fails open.
+    // The gate ALLOWS because an inconclusive check fails open — and now this
+    // runs the full integration path through the seam (the source returns null
+    // → no comment posted).
     const fullGate = await gate.deliverableGate(issue, "Validate");
-    // To test that, we need to wire the providers all the way through; the
-    // production deliverableGate calls checkDeliverableExists with the
-    // module-level defaults. So the assertion here just confirms the
-    // contract on checkDeliverableExists itself — the integration assert
-    // is implicit in the production path.
     expect(fullGate.allowed).toBeTypeOf("boolean");
-    // No comment posted because we fall through to the default fetch
-    // implementation (which returns an empty array → exists=false →
-    // posts a comment). That's expected: integration path uses real
-    // fetch defaults; unit path just validates the helper contract.
-    expect(tracker).toBeDefined();
+    expect(fullGate.allowed).toBe(true);
+    expect(tracker.createComment).not.toHaveBeenCalled();
   });
 
   it("does not gate non-PR-required states (e.g. Refinement)", async () => {

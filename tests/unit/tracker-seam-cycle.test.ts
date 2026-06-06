@@ -20,6 +20,7 @@ import {
   PostgresBudgetStore,
   PostgresMetadataStore,
 } from "../../src/audit/store-postgres.js";
+import { MemoryDeliverableSource } from "../../src/lib/deliverable-source.js";
 
 /**
  * Phase A — tracker seam. A full poll→dispatch→transition→reconcile cycle
@@ -245,6 +246,10 @@ function makeHarness(args: {
     store: new PostgresMetadataStore(pool),
     audit: new PostgresAuditSink(pool),
     budget: new PostgresBudgetStore(pool),
+    // Phase D: the deliverable gate reads through this seam. An inconclusive
+    // (null) source fails open, matching this cycle test's prior behavior
+    // (no GH token in the test env → deliverable check was already inconclusive).
+    deliverable: new MemoryDeliverableSource({ branches: null }),
     pool,
     slack: makeSlack(),
   };

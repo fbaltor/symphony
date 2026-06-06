@@ -11,7 +11,8 @@ import { reconcileStalledRuns, reconcileTrackerStates } from "./reconcile.js";
 import { ensureWorkspace } from "../workspace/manager.js";
 import { runHook } from "../workspace/hooks.js";
 import { getInstallationToken } from "../lib/github-auth.js";
-import { branchMatchesIdentifier, fetchBranches, fetchPullRequestForIssue } from "../lib/github.js";
+import { branchMatchesIdentifier, type GithubBranchSummary } from "../lib/github.js";
+import type { DeliverableSource } from "../lib/deliverable-source.js";
 import { cleanupTerminalIssues, cleanupWorkspace } from "../workspace/cleanup.js";
 import {
   buildContinuationGuidance,
@@ -62,6 +63,15 @@ export interface OrchestratorDeps {
   store: MetadataStore;
   audit: AuditSink;
   budget: BudgetStore;
+  /**
+   * Phase D (zero-dep E2E). The deliverable gate (`pr_required_states`) and
+   * the Release-stage merge-verify guard read GitHub branch / PR state through
+   * this seam instead of calling `fetchBranches` / `fetchPullRequestForIssue`
+   * + `getInstallationToken` directly. The real `GithubDeliverableSource`
+   * wraps those functions unchanged (resolving the token internally); the
+   * in-memory impl scripts branches / PRs for the zero-dependency E2E profile.
+   */
+  deliverable: DeliverableSource;
   /**
    * Raw Postgres pool, still threaded for the seams NOT yet abstracted in
    * Phase C: `ReviewGateStore`, the kill-switch read, `reconcileTrackerStates`
@@ -1592,67 +1602,63 @@ export class Orchestrator {
             defaultNextState === "Done";
           if (aboutToAdvanceToDone) {
             try {
-              const token = await getInstallationToken();
-              if (token) {
-                const prStatus = await fetchPullRequestForIssue(token, issue.identifier, {
-                  owner: this.currentConfig.github.owner,
-                  repo: this.currentConfig.github.repo,
-                });
-                if (prStatus === null) {
-                  // No PR found via search → cannot verify merge → bounce.
-                  mergeVerifyOverride = "Pull request";
-                  logger.warn(
-                    { issue: issue.identifier },
-                    "auto-advance: Release merge-verify failed — no PR found containing Closes <ID>; bouncing to Pull request",
+              // Phase D (zero-dep E2E): PR status comes from the injected
+              // `DeliverableSource` — the real `GithubDeliverableSource`
+              // resolves the GH-App token internally and returns `undefined`
+              // (fail open) when it's missing, so the prior "no token" branch
+              // now collapses into the `prStatus === undefined` case below.
+              const prStatus = await this.deps.deliverable.fetchPullRequestForIssue(
+                issue.identifier,
+              );
+              if (prStatus === null) {
+                // No PR found via search → cannot verify merge → bounce.
+                mergeVerifyOverride = "Pull request";
+                logger.warn(
+                  { issue: issue.identifier },
+                  "auto-advance: Release merge-verify failed — no PR found containing Closes <ID>; bouncing to Pull request",
+                );
+                await this.deps.tracker
+                  .createComment(
+                    issue.id,
+                    `🛑 **Symphony — Release → Done auto-advance blocked.**\n\nNo PR found containing \`Closes ${issue.identifier}\` in body. The Release specialist reported success but produced no merge. Routing back to \`Pull request\` so a human or the next Release run can investigate.\n\n<!-- symphony:event=release_merge_verify_failed reason=no_pr_found -->`,
+                  )
+                  .catch((err) =>
+                    logger.warn(
+                      { err: (err as Error).message, issue: issue.identifier },
+                      "release-merge-verify bounce comment failed",
+                    ),
                   );
-                  await this.deps.tracker
-                    .createComment(
-                      issue.id,
-                      `🛑 **Symphony — Release → Done auto-advance blocked.**\n\nNo PR found containing \`Closes ${issue.identifier}\` in body. The Release specialist reported success but produced no merge. Routing back to \`Pull request\` so a human or the next Release run can investigate.\n\n<!-- symphony:event=release_merge_verify_failed reason=no_pr_found -->`,
-                    )
-                    .catch((err) =>
-                      logger.warn(
-                        { err: (err as Error).message, issue: issue.identifier },
-                        "release-merge-verify bounce comment failed",
-                      ),
-                    );
-                } else if (prStatus !== undefined && prStatus.mergedAt === null) {
-                  // PR exists but is open or closed-without-merge → bounce.
-                  mergeVerifyOverride = "Pull request";
-                  logger.warn(
-                    {
-                      issue: issue.identifier,
-                      prNumber: prStatus.number,
-                      prState: prStatus.state,
-                    },
-                    "auto-advance: Release merge-verify failed — PR not merged; bouncing to Pull request",
+              } else if (prStatus !== undefined && prStatus.mergedAt === null) {
+                // PR exists but is open or closed-without-merge → bounce.
+                mergeVerifyOverride = "Pull request";
+                logger.warn(
+                  {
+                    issue: issue.identifier,
+                    prNumber: prStatus.number,
+                    prState: prStatus.state,
+                  },
+                  "auto-advance: Release merge-verify failed — PR not merged; bouncing to Pull request",
+                );
+                await this.deps.tracker
+                  .createComment(
+                    issue.id,
+                    `🛑 **Symphony — Release → Done auto-advance blocked.**\n\nPR [#${prStatus.number}](${prStatus.htmlUrl}) is \`${prStatus.state}\` but not merged (no \`merged_at\` timestamp). The Release specialist reported success but the merge did not land. Routing back to \`Pull request\` so the next Release run can retry.\n\n<!-- symphony:event=release_merge_verify_failed reason=pr_not_merged pr=${prStatus.number} -->`,
+                  )
+                  .catch((err) =>
+                    logger.warn(
+                      { err: (err as Error).message, issue: issue.identifier },
+                      "release-merge-verify bounce comment failed",
+                    ),
                   );
-                  await this.deps.tracker
-                    .createComment(
-                      issue.id,
-                      `🛑 **Symphony — Release → Done auto-advance blocked.**\n\nPR [#${prStatus.number}](${prStatus.htmlUrl}) is \`${prStatus.state}\` but not merged (no \`merged_at\` timestamp). The Release specialist reported success but the merge did not land. Routing back to \`Pull request\` so the next Release run can retry.\n\n<!-- symphony:event=release_merge_verify_failed reason=pr_not_merged pr=${prStatus.number} -->`,
-                    )
-                    .catch((err) =>
-                      logger.warn(
-                        { err: (err as Error).message, issue: issue.identifier },
-                        "release-merge-verify bounce comment failed",
-                      ),
-                    );
-                } else if (prStatus === undefined) {
-                  // Transient GitHub failure — fail open (proceed with default).
-                  logger.info(
-                    { issue: issue.identifier },
-                    "auto-advance: Release merge-verify inconclusive (GitHub API failure); failing open",
-                  );
-                }
-                // else: mergedAt non-null → merged → proceed normally.
-              } else {
-                // No GH App token (local dev / placeholder env) — fail open.
+              } else if (prStatus === undefined) {
+                // Transient GitHub failure OR missing GH token — fail open
+                // (proceed with default).
                 logger.info(
                   { issue: issue.identifier },
-                  "auto-advance: Release merge-verify skipped (no GH token); failing open",
+                  "auto-advance: Release merge-verify inconclusive (GitHub API failure or no token); failing open",
                 );
               }
+              // else: mergedAt non-null → merged → proceed normally.
             } catch (err) {
               logger.warn(
                 { err: (err as Error).message, issue: issue.identifier },
@@ -1980,26 +1986,23 @@ export class Orchestrator {
    *               advance during a GitHub outage is worse than the bug
    *               we're fixing.
    *
-   * The injectable `tokenProvider` / `branchFetcher` parameters exist so
-   * unit tests can substitute fakes without monkey-patching the cached
-   * GH-App token minter or `globalThis.fetch`.
+   * Phase D (zero-dep E2E): the branch data now comes from the injected
+   * `DeliverableSource` (`this.deps.deliverable`) instead of a module-level
+   * `fetchBranches` + `getInstallationToken` call — the real
+   * `GithubDeliverableSource` resolves the GH-App token internally, the
+   * in-memory source scripts branches with no network. The `branchFetcher`
+   * parameter defaults to that seam and exists so unit tests can substitute a
+   * fake without monkey-patching `globalThis.fetch`.
    */
   private async checkDeliverableExists(
     issue: Issue,
-    tokenProvider: () => Promise<string | null> = getInstallationToken,
-    branchFetcher: typeof fetchBranches = fetchBranches,
+    branchFetcher: () => Promise<GithubBranchSummary[] | null> = () =>
+      this.deps.deliverable.fetchBranches(),
   ): Promise<boolean | null> {
-    const token = await tokenProvider();
-    if (!token) {
-      // No GH App token (local dev / placeholder env). Fail open.
-      return null;
-    }
-    // Read repo coordinates from WORKFLOW.md `github.owner` / `github.repo`
-    // (required fields — preflightValidate rejects a boot without them).
-    const branches = await branchFetcher(token, {
-      owner: this.currentConfig.github.owner,
-      repo: this.currentConfig.github.repo,
-    });
+    // `null` means "couldn't tell" (no GH App token / network or 5xx error) —
+    // the source absorbs the token plumbing and surfaces it as null. Caller
+    // fails open.
+    const branches = await branchFetcher();
     if (branches === null) return null;
     return branches.some((b) => branchMatchesIdentifier(b.name, issue.identifier));
   }

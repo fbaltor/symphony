@@ -14,7 +14,8 @@ import {
   PostgresBudgetStore,
   PostgresMetadataStore,
 } from "./audit/store-postgres.js";
-import { acquireInstanceLock } from "./singleton/instance-lock.js";
+import { PostgresInstanceLock } from "./singleton/lock.js";
+import { GithubDeliverableSource } from "./lib/deliverable-source.js";
 import { SlackObserver } from "./observability/slack.js";
 import { handleHttpRequest } from "./observability/http-routes.js";
 import {
@@ -171,7 +172,12 @@ async function main(): Promise<void> {
     const auditSink = new PostgresAuditSink(pool);
     const budgetStore = new PostgresBudgetStore(pool);
 
-    lockHandle = await acquireInstanceLock(pool, {
+    // Phase D (zero-dep E2E): the advisory lock goes through the `InstanceLock`
+    // seam. `PostgresInstanceLock` is a thin wrapper that delegates to the
+    // unchanged `acquireInstanceLock`, so the real boot path is identical. The
+    // E2E memory profile (phase E) swaps in `MemoryInstanceLock`.
+    const instanceLock = new PostgresInstanceLock(pool);
+    lockHandle = await instanceLock.acquire({
       onHandoffRequested: () => {
         // AGENT-520: another Cloud Run revision is asking us to step down.
         // Re-use the existing SIGTERM-driven shutdown path (drain workers
@@ -248,6 +254,16 @@ async function main(): Promise<void> {
       ? new SlackObserver({ token: slackToken, channelId: slackChannelResolved, pool })
       : new SlackObserver({ token: undefined, channelId: undefined });
 
+    // Phase D (zero-dep E2E): the deliverable gate + Release merge-verify guard
+    // read GitHub through this seam. The real source wraps `fetchBranches` /
+    // `fetchPullRequestForIssue` and resolves the GH-App token internally, so
+    // the `kind=linear` path behaves byte-for-byte as before. owner/repo are
+    // required fields (preflightValidate rejects a boot without them).
+    const deliverable = new GithubDeliverableSource({
+      owner: cfg.github.owner,
+      repo: cfg.github.repo,
+    });
+
     orchestrator = new Orchestrator({
       watcher,
       tracker,
@@ -255,6 +271,7 @@ async function main(): Promise<void> {
       store: metadataStore,
       audit: auditSink,
       budget: budgetStore,
+      deliverable,
       pool,
       slack,
       // Task 2 (2026-05-06): instance ID flows into the orchestrator so

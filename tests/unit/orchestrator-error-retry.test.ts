@@ -9,6 +9,7 @@ import {
   PostgresBudgetStore,
   PostgresMetadataStore,
 } from "../../src/audit/store-postgres.js";
+import { MemoryDeliverableSource } from "../../src/lib/deliverable-source.js";
 
 /**
  * Coverage:
@@ -184,6 +185,9 @@ function makeOrchestrator(opts: {
     store: new PostgresMetadataStore(pool),
     audit: new PostgresAuditSink(pool),
     budget: new PostgresBudgetStore(pool),
+    // Phase D: deliverable gate seam — inconclusive (fail open), unused by the
+    // error-retry path under test.
+    deliverable: new MemoryDeliverableSource({ branches: null }),
     pool,
     slack,
   } as unknown as OrchestratorDeps;
