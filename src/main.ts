@@ -5,18 +5,9 @@ import { logger } from "./observability/logger.js";
 import { WorkflowError } from "./workflow/loader.js";
 import { WorkflowWatcher } from "./workflow/watch.js";
 import { LinearTrackerClient } from "./tracker/linear.js";
-import { createAgentRunner } from "./agent/runner-factory.js";
-import { buildMcpServers } from "./agent/mcp-config.js";
 import { Orchestrator } from "./orchestrator/orchestrator.js";
-import { createPool, shutdownPool } from "./audit/client.js";
-import {
-  PostgresAuditSink,
-  PostgresBudgetStore,
-  PostgresMetadataStore,
-} from "./audit/store-postgres.js";
-import { PostgresInstanceLock } from "./singleton/lock.js";
-import { GithubDeliverableSource } from "./lib/deliverable-source.js";
-import { SlackObserver } from "./observability/slack.js";
+import { shutdownPool } from "./audit/client.js";
+import { buildDeps } from "./deps.js";
 import { handleHttpRequest } from "./observability/http-routes.js";
 import {
   pruneWebhookDedup,
@@ -157,27 +148,33 @@ async function main(): Promise<void> {
     const snapshot = watcher.snapshot();
     const cfg = snapshot.config;
 
-    pool = createPool({
-      databaseUrl,
-      schema: process.env.DB_SCHEMA ?? "symphony",
+    // Phase E (zero-dep E2E): build the orchestrator's dependency bundle via
+    // the `buildDeps` composition factory. For `kind=linear` (the production
+    // profile) this constructs the SAME impls main.ts always built — createPool,
+    // the Postgres-backed stores, PostgresInstanceLock, LinearTrackerClient, the
+    // per-turn-MCP-resolving Claude runner, the real/disabled SlackObserver, and
+    // GithubDeliverableSource — so the boot path is behavior-identical. main.ts
+    // still owns ALL boot orchestration (lock acquire, orphan reaper, viewer-id
+    // fetch, watcher start, HTTP routes, signals, drain), reaching into the
+    // bundle's `pool` / `lock` / `tracker` for those steps. The env-derived
+    // inputs (DATABASE_URL, Slack creds) and the file-watching `watcher` are
+    // owned here and threaded in via `overrides.linear`.
+    const deps = buildDeps(cfg, {
+      linear: {
+        watcher,
+        databaseUrl,
+        dbSchema: process.env.DB_SCHEMA ?? "symphony",
+        slackToken,
+        slackChannel,
+      },
     });
+    pool = deps.pool as pg.Pool;
     poolRef = pool;
 
-    // Phase C (zero-dep E2E): construct the Postgres-backed stores once from
-    // the pool. They are EXACT thin wrappers over today's audit/guardrail
-    // functions, so the `kind=linear` profile behaves byte-for-byte as before.
-    // The orchestrator + specialists now depend on these interfaces instead of
-    // the raw pool; only the composition root (here) still sees `pg`.
-    const metadataStore = new PostgresMetadataStore(pool);
-    const auditSink = new PostgresAuditSink(pool);
-    const budgetStore = new PostgresBudgetStore(pool);
-
     // Phase D (zero-dep E2E): the advisory lock goes through the `InstanceLock`
-    // seam. `PostgresInstanceLock` is a thin wrapper that delegates to the
-    // unchanged `acquireInstanceLock`, so the real boot path is identical. The
-    // E2E memory profile (phase E) swaps in `MemoryInstanceLock`.
-    const instanceLock = new PostgresInstanceLock(pool);
-    lockHandle = await instanceLock.acquire({
+    // seam from the bundle. `PostgresInstanceLock` delegates to the unchanged
+    // `acquireInstanceLock`, so the real boot path is identical.
+    lockHandle = await deps.lock.acquire({
       onHandoffRequested: () => {
         // AGENT-520: another Cloud Run revision is asking us to step down.
         // Re-use the existing SIGTERM-driven shutdown path (drain workers
@@ -189,6 +186,11 @@ async function main(): Promise<void> {
         if (triggerHandoff) triggerHandoff();
       },
     });
+    // PostgresInstanceLock always resolves to a handle (it blocks until held);
+    // null would only come from a memory lock, which main.ts never builds.
+    if (!lockHandle) {
+      throw new Error("instance lock acquire returned null (unexpected for kind=linear)");
+    }
     instanceIdRef = lockHandle.instanceId;
 
     // Task 2 (2026-05-06): orphan-run reaper. Find `running_runs` rows
@@ -201,17 +203,12 @@ async function main(): Promise<void> {
     // acquired the lock; observability gap is recoverable on next
     // boot). Synchronous before orchestrator.start() so reaped rows
     // settle before the new instance starts dispatching.
-    const reaped = await auditSink.reapOrphanedRuns(lockHandle.instanceId);
+    const reaped = await deps.audit.reapOrphanedRuns(lockHandle.instanceId);
     if (reaped > 0) {
       logger.warn({ reaped }, "boot: reaped orphaned running_runs from prior instance");
     }
 
-    const tracker = new LinearTrackerClient({
-      endpoint: cfg.tracker.endpoint,
-      apiKey: cfg.tracker.apiKey,
-      projectSlug: cfg.tracker.projectSlug,
-      teamId: cfg.tracker.teamId,
-    });
+    const tracker = deps.tracker as LinearTrackerClient;
     // E-17 / E-18: publish the tracker to the HTTP route closure so the
     // `/webhook/linear` receiver can drive cascades via the same client
     // the poll loop uses (token, scope, retry semantics all match).
@@ -233,52 +230,13 @@ async function main(): Promise<void> {
       );
     }
 
-    // Phase B (zero-dep E2E): `cfg.agentRuntime.runtime` is now
-    // `z.enum(["claude", "fake"])` — the factory maps it to the real Claude
-    // adapter (default) or the scripted FakeAgentRunner without changing this
-    // call site. Invalid values fail at WorkflowWatcher.start with a
-    // structured zod error. `model` / `effort` flow from config inside the
-    // factory; the Claude-only per-turn MCP resolver is passed as an override.
-    //
-    // A-10: agent_runtime.effort forwarded if WORKFLOW.md sets it.
-    // Re-resolve MCP servers per turn so freshly minted GitHub App tokens (1h
-    // expiry) are used. `buildMcpServers` reads from process.env so the
-    // env-injected secrets in Cloud Run flow through. A-12: pass tracker so
-    // the in-process `linear_graphql` tool can reuse Symphony's Linear auth.
-    const runner = createAgentRunner(cfg, {
-      claude: { mcpServersResolver: () => buildMcpServers({ tracker }) },
-    });
-
-    const slackChannelResolved = cfg.slack.channelId ?? slackChannel ?? undefined;
-    const slack = cfg.slack.enabled
-      ? new SlackObserver({ token: slackToken, channelId: slackChannelResolved, pool })
-      : new SlackObserver({ token: undefined, channelId: undefined });
-
-    // Phase D (zero-dep E2E): the deliverable gate + Release merge-verify guard
-    // read GitHub through this seam. The real source wraps `fetchBranches` /
-    // `fetchPullRequestForIssue` and resolves the GH-App token internally, so
-    // the `kind=linear` path behaves byte-for-byte as before. owner/repo are
-    // required fields (preflightValidate rejects a boot without them).
-    const deliverable = new GithubDeliverableSource({
-      owner: cfg.github.owner,
-      repo: cfg.github.repo,
-    });
-
     orchestrator = new Orchestrator({
-      watcher,
-      tracker,
-      runner,
-      store: metadataStore,
-      audit: auditSink,
-      budget: budgetStore,
-      deliverable,
-      pool,
-      slack,
+      ...deps,
       // Task 2 (2026-05-06): instance ID flows into the orchestrator so
       // each worker writes a `running_runs` row tagged with this
-      // revision's identity. The orphan reaper at the top of bootstrap
-      // (below) ran BEFORE this point and already wrote synthetic
-      // Killed audit rows for any rows from a prior crashed instance.
+      // revision's identity. The orphan reaper above ran BEFORE this
+      // point and already wrote synthetic Killed audit rows for any rows
+      // from a prior crashed instance.
       instanceId: lockHandle.instanceId,
     });
     orchestratorRef = orchestrator;

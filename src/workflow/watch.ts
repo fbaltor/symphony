@@ -64,6 +64,29 @@ export class WorkflowWatcher {
     return w;
   }
 
+  /**
+   * Phase E (zero-dep E2E) — build a watcher around an already-resolved config
+   * with NO file watch. Used by `buildDeps` so the `kind: memory` profile gets
+   * a real `WorkflowWatcher` (so `Orchestrator` reads `snapshot()` / wires
+   * `onChange()` exactly as in production) without touching the filesystem.
+   *
+   * No `attach()` is called, so there is no `fs.watch` handle and `stop()` is a
+   * no-op for the timer/watcher — reload is simply never triggered. The
+   * `promptTemplate` defaults to a minimal Liquid template that renders the
+   * issue identifier, mirroring the test harnesses.
+   */
+  static fromConfig(config: SymphonyConfig, promptTemplate?: string): WorkflowWatcher {
+    const raw: RawWorkflow = {
+      config: {},
+      promptTemplate: promptTemplate ?? "{{ issue.identifier }}",
+    };
+    const snapshot: WorkflowSnapshot = { raw, config, loadedAt: Date.now() };
+    // The synthetic path is never read (no attach / no reload) but keeps the
+    // ResolveContext well-formed for the unused reload machinery.
+    const ctx: ResolveContext = { workflowPath: "memory://WORKFLOW.md", env: {} };
+    return new WorkflowWatcher("memory://WORKFLOW.md", ctx, snapshot);
+  }
+
   private attach(): void {
     try {
       this.watcher = watch(this.path, { persistent: true }, (event) => {

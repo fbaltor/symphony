@@ -14,14 +14,15 @@ import type { RawWorkflow } from "./loader.js";
  *   4. coerce / validate via Zod
  */
 
-const trackerSchema = z
-  .object({
-    kind: z.literal("linear"),
-    endpoint: z.string().default("https://api.linear.app/graphql"),
-    apiKey: z.string().min(1),
-    projectSlug: z.string().optional(),
-    teamId: z.string().optional(),
-    activeStates: z.array(z.string()).default(["Todo", "In Progress"]),
+/**
+ * Fields shared by every `tracker.kind` variant — the state-machine config the
+ * orchestrator drives regardless of whether issues come from Linear or the
+ * in-memory tracker. Factored out so the discriminated union (decision 3b) can
+ * layer the kind-specific connection fields (`apiKey` / `endpoint` /
+ * `projectSlug`) on top without duplicating ~80 lines of state config twice.
+ */
+const trackerCommonShape = {
+  activeStates: z.array(z.string()).default(["Todo", "In Progress"]),
     terminalStates: z
       .array(z.string())
       .default(["Closed", "Cancelled", "Canceled", "Duplicate", "Done"]),
@@ -101,8 +102,59 @@ const trackerSchema = z
      * non-Succeeded outcome.
      */
     noPrRetryLimit: z.number().int().positive().default(3),
-  })
-  .refine((v) => Boolean(v.projectSlug) || Boolean(v.teamId), {
+};
+
+/**
+ * Connection fields shared between the `linear` and `memory` variants so the
+ * union members stay structurally compatible: `cfg.tracker.endpoint` /
+ * `.apiKey` / `.projectSlug` / `.teamId` are readable on the union without a
+ * `kind` narrow. The `linear` variant additionally REQUIRES `apiKey` and a
+ * `projectSlug`-or-`teamId`; the `memory` variant leaves them all optional
+ * (decision 3b — no Linear creds needed for the in-process E2E profile).
+ */
+const trackerConnectionShape = {
+  endpoint: z.string().default("https://api.linear.app/graphql"),
+  projectSlug: z.string().optional(),
+  teamId: z.string().optional(),
+};
+
+/**
+ * `tracker.kind` is a discriminated union (zero-dep E2E plan, decision 3b):
+ *
+ *   - `linear` — the production tracker. Requires a non-empty `apiKey` and at
+ *     least one of `projectSlug` / `teamId` (the `.refine` below, preserving
+ *     today's behavior byte-for-byte).
+ *   - `memory` — the in-process `MemoryTracker` profile used by the
+ *     zero-dependency E2E harness. Needs NO `apiKey` / `endpoint`; seed issues
+ *     are supplied at composition time (`buildDeps` overrides), not via config.
+ *
+ * The variants share `trackerCommonShape` (state-machine config) and
+ * `trackerConnectionShape` (connection fields) so the orchestrator's config
+ * surface is identical regardless of kind.
+ */
+const linearTrackerSchema = z.object({
+  kind: z.literal("linear"),
+  apiKey: z.string().min(1),
+  ...trackerConnectionShape,
+  ...trackerCommonShape,
+});
+
+const memoryTrackerSchema = z.object({
+  kind: z.literal("memory"),
+  // Optional so a `kind: memory` config parses with no Linear creds at all.
+  apiKey: z.string().optional(),
+  ...trackerConnectionShape,
+  ...trackerCommonShape,
+});
+
+// The `projectSlug`-or-`teamId` requirement applies ONLY to the linear variant.
+// It lives on the union (not inside the member) because `discriminatedUnion`
+// members must be bare `ZodObject`s — a `.refine()` would wrap them in a
+// `ZodEffects` and break discrimination. Gating on `kind === "linear"` keeps
+// the memory variant unconstrained while preserving today's linear behavior.
+const trackerSchema = z
+  .discriminatedUnion("kind", [linearTrackerSchema, memoryTrackerSchema])
+  .refine((v) => v.kind !== "linear" || Boolean(v.projectSlug) || Boolean(v.teamId), {
     message: "tracker.project_slug or tracker.team_id is required",
     path: ["projectSlug"],
   });
@@ -545,12 +597,19 @@ function lowercaseStateArrayMap(
 /** Spec §6.3 — preflight validation. Returns null if OK; error message if not. */
 export function preflightValidate(cfg: SymphonyConfig): string | null {
   if (!cfg.tracker.kind) return "tracker.kind missing";
-  if (!cfg.tracker.apiKey) return "tracker.api_key missing after resolution";
-  if (looksUnresolved(cfg.tracker.apiKey)) {
-    return `tracker.api_key has unresolved env token: ${cfg.tracker.apiKey}`;
-  }
-  if (cfg.tracker.kind === "linear" && !cfg.tracker.projectSlug && !cfg.tracker.teamId) {
-    return "tracker.project_slug or tracker.team_id required when kind=linear";
+  // Linear-credential checks apply ONLY to `kind=linear` (decision 3b). The
+  // `kind=memory` profile (zero-dependency E2E) needs no apiKey / endpoint /
+  // projectSlug — its issues are seeded at composition time, not fetched from
+  // Linear — so it skips this whole block and validates on the shared fields
+  // (slack / codex / github) below. The `kind=linear` path is unchanged.
+  if (cfg.tracker.kind === "linear") {
+    if (!cfg.tracker.apiKey) return "tracker.api_key missing after resolution";
+    if (looksUnresolved(cfg.tracker.apiKey)) {
+      return `tracker.api_key has unresolved env token: ${cfg.tracker.apiKey}`;
+    }
+    if (!cfg.tracker.projectSlug && !cfg.tracker.teamId) {
+      return "tracker.project_slug or tracker.team_id required when kind=linear";
+    }
   }
   // A-7: catch the literal `$SLACK_CHANNEL_ID` pass-through bug. When the env
   // var is unset, `expandEnvAndHome()` leaves the placeholder unchanged and
