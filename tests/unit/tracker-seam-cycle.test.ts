@@ -17,18 +17,34 @@ import type { AgentEvent } from "../../src/agent/events.js";
 import type { SlackObserver } from "../../src/observability/slack.js";
 
 /**
- * Phase A — tracker seam. Bullets 1-3: a full poll→dispatch→transition→
- * reconcile cycle driven entirely by an in-memory `IssueTracker`
- * (`MemoryTracker`), with NO Linear.
+ * Phase A — tracker seam. A full poll→dispatch→transition→reconcile cycle
+ * driven entirely by an in-memory `IssueTracker` (`MemoryTracker`), with NO
+ * Linear.
  *
  * The seam under test: `OrchestratorDeps.tracker` is typed as `IssueTracker`
- * (not the concrete `LinearTrackerClient`), so a `MemoryTracker` plugs in
- * and the orchestrator's poll loop runs end-to-end. These tests assert the
+ * (not the concrete `LinearTrackerClient`), so a `MemoryTracker` plugs in and
+ * the orchestrator's poll loop runs end-to-end. These tests assert the
  * orchestrator's OBSERVABLE effects through the tracker — dispatch counts and
  * state advances — rather than internal bookkeeping.
  *
- * Authored before any implementation exists — expected RED (MemoryTracker
- * doesn't exist; `tracker` dep is still typed LinearTrackerClient).
+ * Two distinct dispatch behaviors are exercised, and the tests are careful NOT
+ * to conflate them (the original conflation is what this rework fixes):
+ *
+ *   - AUTO-ADVANCE (no dispatch): a NON-specialist active state with a
+ *     configured `state_transitions` edge (e.g. `Active → Done`) is
+ *     auto-advanced in one tick WITHOUT dispatching an agent — this is the
+ *     orchestrator's free fast path. The seam is still exercised: the candidate
+ *     read and the transition write-back both flow through the
+ *     `IssueTracker`-typed `MemoryTracker`. (behavior 1)
+ *
+ *   - DISPATCH: a SPECIALIST-owned active state (e.g. `Prioritized`) is the
+ *     dispatchable case. The auto-advance fast path is gated on `!hasSpecialist`
+ *     and the cascade-only skip is gated on `!hasSpecialist && !hasTransition`,
+ *     so ONLY specialist states fall through to `dispatch()` and drive an agent
+ *     turn through the injected `AgentRunner`. We give the specialist state a
+ *     SELF-LOOP edge (`Prioritized → Prioritized`) so the post-turn auto-advance
+ *     is a no-op and the issue stays put — letting us assert dispatch counts
+ *     without the state racing forward. (behaviors 2, 3, 4)
  */
 
 /* --------------------------- config + fixtures --------------------------- */
@@ -257,10 +273,13 @@ afterEach(() => {
   }
 });
 
-/* ------------------------------ bullet 1 ------------------------------ */
+/* ------------------------------ behavior 1 ----------------------------- */
 
-describe("bullet 1: one tick dispatches the single eligible issue and advances it", () => {
-  it("dispatches one issue and advances it to the configured next state", async () => {
+describe("behavior 1: a non-specialist FORWARD-transition state auto-advances WITHOUT dispatching", () => {
+  it("advances Active → Done in one tick and dispatches NO agent", async () => {
+    // `Active` has no owning specialist and a FORWARD edge
+    // (`state_transitions["Active"] = "Done"`), so the orchestrator's
+    // auto-advance fast path fires the transition directly and skips dispatch.
     const config = makeConfig({ workspaceRoot: tmpRoot });
     const { orchestrator, tracker, runner } = makeHarness({
       config,
@@ -271,41 +290,91 @@ describe("bullet 1: one tick dispatches the single eligible issue and advances i
     await drainWorkers(orchestrator);
     await orchestrator.stop();
 
-    // Dispatched exactly once.
-    expect(runner.startCalls).toBe(1);
-    expect(runner.startedIssues).toEqual(["a"]);
+    // No dispatch: the auto-advance is free — no agent turn was started.
+    expect(runner.startCalls).toBe(0);
+    expect(runner.startedIssues).toEqual([]);
 
-    // Advanced to the configured next state (state_transitions["Active"] = "Done").
+    // Advanced to the configured next state, written back through the
+    // IssueTracker-typed MemoryTracker.
     const [after] = await tracker.fetchIssueStatesByIds(["a"]);
     expect(after?.state).toBe("Done");
   });
 
-  it("does NOT advance the issue when the turn outcome is a failure", async () => {
-    // Falsifiable counterpart: advance is gated on a Succeeded outcome. A
-    // failed turn must leave the issue in its active state.
-    const config = makeConfig({ workspaceRoot: tmpRoot });
-    const runner = makeRunner({ outcome: "failed" });
-    const { orchestrator, tracker } = makeHarness({
+  it("does NOT advance (and does NOT dispatch) a non-specialist state with NO forward edge", async () => {
+    // Falsifiable counterpart: a non-specialist active state with an EMPTY
+    // state_transitions map is cascade-only — there's no edge to advance along
+    // and no specialist to dispatch, so the issue must stay put and the runner
+    // must stay idle. If the auto-advance path were over-eager (advancing on a
+    // missing edge) or the dispatch path were over-eager (dispatching a
+    // cascade-only state), this assertion would fail.
+    const config = makeConfig({
+      workspaceRoot: tmpRoot,
+      tracker: { activeStates: ["Active"], stateTransitions: {} },
+    });
+    const { orchestrator, tracker, runner } = makeHarness({
       config,
       seed: [makeIssue({ id: "a", identifier: "MEM-1", state: "Active" })],
-      runner,
     });
 
     await pollOnce(orchestrator);
     await drainWorkers(orchestrator);
     await orchestrator.stop();
 
+    expect(runner.startCalls).toBe(0);
     const [after] = await tracker.fetchIssueStatesByIds(["a"]);
     expect(after?.state).toBe("Active");
   });
 });
 
-/* ------------------------------ bullet 2 ------------------------------ */
+/* ------------------------- behaviors 2 & 3 ----------------------------- */
 
-describe("bullet 2: concurrency cap bounds dispatch per tick", () => {
+/**
+ * Config for the DISPATCH behaviors. `Prioritized` is a SPECIALIST-owned state
+ * (so it is NOT eligible for the free auto-advance fast path, which is gated on
+ * `!hasSpecialist`). Its SELF-LOOP edge (`state_transitions["Prioritized"] =
+ * "Prioritized"`) makes the post-turn auto-advance a no-op, so a dispatched
+ * issue stays `Prioritized` and we can assert dispatch counts cleanly.
+ */
+const DISPATCH_STATE = "Prioritized";
+
+function makeDispatchConfig(overrides?: {
+  workspaceRoot?: string;
+  agent?: Partial<SymphonyConfig["agent"]>;
+}): SymphonyConfig {
+  return makeConfig({
+    workspaceRoot: overrides?.workspaceRoot,
+    tracker: { activeStates: [DISPATCH_STATE], stateTransitions: { [DISPATCH_STATE]: DISPATCH_STATE } },
+    agent: overrides?.agent,
+  });
+}
+
+describe("behavior 2: a specialist-owned dispatchable state dispatches an agent and stays put", () => {
+  it("dispatches the single eligible issue and leaves it in its state (self-loop, no forward advance)", async () => {
+    const config = makeDispatchConfig({ workspaceRoot: tmpRoot });
+    const { orchestrator, tracker, runner } = makeHarness({
+      config,
+      seed: [makeIssue({ id: "a", identifier: "MEM-1", state: DISPATCH_STATE })],
+    });
+
+    await pollOnce(orchestrator);
+    await drainWorkers(orchestrator);
+    await orchestrator.stop();
+
+    // Dispatched exactly once via the injected runner.
+    expect(runner.startCalls).toBe(1);
+    expect(runner.startedIssues).toEqual(["a"]);
+
+    // The self-loop transition (Prioritized → Prioritized) is a no-op move —
+    // the issue is still Prioritized, never advanced past its state.
+    const [after] = await tracker.fetchIssueStatesByIds(["a"]);
+    expect(after?.state).toBe(DISPATCH_STATE);
+  });
+});
+
+describe("behavior 3: concurrency cap bounds dispatch per tick", () => {
   it("dispatches exactly N when there are N+1 eligible issues and the limit is N", async () => {
     const N = 2;
-    const config = makeConfig({
+    const config = makeDispatchConfig({
       workspaceRoot: tmpRoot,
       agent: { maxConcurrentAgents: N, maxTurns: 1, maxRetryBackoffMs: 60_000, maxConcurrentAgentsByState: {} },
     });
@@ -320,9 +389,9 @@ describe("bullet 2: concurrency cap bounds dispatch per tick", () => {
     const { orchestrator, runner: r } = makeHarness({
       config,
       seed: [
-        makeIssue({ id: "a", identifier: "MEM-1", state: "Active", priority: 1 }),
-        makeIssue({ id: "b", identifier: "MEM-2", state: "Active", priority: 2 }),
-        makeIssue({ id: "c", identifier: "MEM-3", state: "Active", priority: 3 }),
+        makeIssue({ id: "a", identifier: "MEM-1", state: DISPATCH_STATE, priority: 1 }),
+        makeIssue({ id: "b", identifier: "MEM-2", state: DISPATCH_STATE, priority: 2 }),
+        makeIssue({ id: "c", identifier: "MEM-3", state: DISPATCH_STATE, priority: 3 }),
       ],
       runner,
     });
@@ -339,7 +408,7 @@ describe("bullet 2: concurrency cap bounds dispatch per tick", () => {
 
   it("leaves the remainder queued (still active) after the capped tick", async () => {
     const N = 1;
-    const config = makeConfig({
+    const config = makeDispatchConfig({
       workspaceRoot: tmpRoot,
       agent: { maxConcurrentAgents: N, maxTurns: 1, maxRetryBackoffMs: 60_000, maxConcurrentAgentsByState: {} },
     });
@@ -351,8 +420,8 @@ describe("bullet 2: concurrency cap bounds dispatch per tick", () => {
     const { orchestrator, tracker, runner: r } = makeHarness({
       config,
       seed: [
-        makeIssue({ id: "a", identifier: "MEM-1", state: "Active", priority: 1 }),
-        makeIssue({ id: "b", identifier: "MEM-2", state: "Active", priority: 2 }),
+        makeIssue({ id: "a", identifier: "MEM-1", state: DISPATCH_STATE, priority: 1 }),
+        makeIssue({ id: "b", identifier: "MEM-2", state: DISPATCH_STATE, priority: 2 }),
       ],
       runner,
     });
@@ -361,7 +430,7 @@ describe("bullet 2: concurrency cap bounds dispatch per tick", () => {
     expect(r.startCalls).toBe(N);
 
     // The undispatched issue remains in its active state, still pollable.
-    const stillActive = await tracker.fetchCandidateIssues(["Active"]);
+    const stillActive = await tracker.fetchCandidateIssues([DISPATCH_STATE]);
     const queuedIds = stillActive.map((i: Issue) => i.id);
     expect(queuedIds).toContain("b");
 
@@ -371,11 +440,13 @@ describe("bullet 2: concurrency cap bounds dispatch per tick", () => {
   });
 });
 
-/* ------------------------------ bullet 3 ------------------------------ */
+/* ------------------------------ behavior 4 ----------------------------- */
 
-describe("bullet 3: reconciliation cancels an in-flight run whose issue went ineligible", () => {
+describe("behavior 4: reconciliation cancels an in-flight run whose issue went ineligible", () => {
   it("cancels the worker and does not re-dispatch when the issue moved to a terminal state mid-flight", async () => {
-    const config = makeConfig({ workspaceRoot: tmpRoot });
+    // Dispatch behavior, so the specialist-owned self-loop state keeps a real
+    // worker in-flight (the auto-advance fast path would never dispatch one).
+    const config = makeDispatchConfig({ workspaceRoot: tmpRoot });
     // Keep the worker in-flight across reconcile by gating its turn.
     let release!: () => void;
     const gate = new Promise<void>((r) => {
@@ -384,7 +455,7 @@ describe("bullet 3: reconciliation cancels an in-flight run whose issue went ine
     const runner = makeRunner({ turnGate: gate });
     const { orchestrator, tracker, runner: r } = makeHarness({
       config,
-      seed: [makeIssue({ id: "a", identifier: "MEM-1", state: "Active" })],
+      seed: [makeIssue({ id: "a", identifier: "MEM-1", state: DISPATCH_STATE })],
       runner,
     });
 

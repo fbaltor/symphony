@@ -484,16 +484,6 @@ export class Orchestrator {
     const terminalLower = cfg.terminalStates.map((s) => s.toLowerCase());
     const activeLower = cfg.activeStates.map((s) => s.toLowerCase());
     const workerStateLower = entry.issue.state.toLowerCase();
-    // The protection only covers the Release-style "specialist that hands
-    // off to Done" pattern — the narrow window where the Release SPECIALIST
-    // drives `gh pr merge` and Linear's native automation flips the issue
-    // to Done before the worker writes its `## Release report` + audit row.
-    // A non-specialist legacy-template state whose forward edge happens to
-    // point at a terminal state is NOT that pattern: when its issue goes
-    // terminal mid-flight (e.g. a human dragged it to Done) reconciliation
-    // SHOULD cancel the worker. Requiring a registered specialist keeps the
-    // Release guard intact while letting generic workers be cancelled.
-    if (findSpecialist(entry.issue.state) === null) return false;
     // The worker's current Linear state must be active AND its forward
     // edge in `state_transitions` must point at a terminal state — that's
     // the "specialist that hands off to Done" pattern (Release).
@@ -666,38 +656,31 @@ export class Orchestrator {
           continue;
         }
 
-        // §8 / E-13 pass-through (self-loop) states: state HAS a
-        // state_transitions edge that points back at ITSELF and NO LLM
-        // specialist (e.g. Development, whose `state_transitions` self-loop
-        // keeps the parent put while the cascade fans out its sub-issues).
-        // For these there is no forward progress to make and no specialist
-        // turn to run, so firing the (no-op) self-transition here and
-        // skipping dispatch avoids a wasted legacy WORKFLOW.staging.md
-        // envelope turn (~$1) on a state that produces nothing.
-        //
-        // A FORWARD transition (next state differs from the current one)
-        // with no specialist is NOT a pass-through — it's a legacy-template
-        // worked state: the orchestrator dispatches via `buildFullPrompt`
-        // and `runWorker` auto-advances per `state_transitions` only on a
-        // Succeeded outcome. Letting it fall through keeps that gating
-        // (a failed turn must NOT advance the issue).
-        const transitionOnlyNext = hasTransition ? this.lookupNextState(issue.state) : null;
-        const isSelfLoopTransition =
-          transitionOnlyNext !== null &&
-          transitionOnlyNext.toLowerCase() === stateLower;
-        if (!hasSpecialist && isSelfLoopTransition) {
-          logger.info(
-            { issue: issue.identifier, fromState: issue.state, toState: transitionOnlyNext },
-            "pass-through state: firing self-transition directly without dispatching",
-          );
-          await this.deps.tracker
-            .transitionIssueToState(issue.id, transitionOnlyNext)
-            .catch((err) =>
-              logger.warn(
-                { err: (err as Error).message, issue: issue.identifier },
-                "pass-through self-transition failed; will retry on next tick",
-              ),
+        // §8 / E-13 transition-only states: state HAS a state_transitions
+        // edge but NO LLM specialist (e.g. "Ready to deploy" auto-advances
+        // to "PR validation"). Without this skip, the orchestrator falls
+        // through to the legacy WORKFLOW.staging.md envelope and dispatches
+        // a no-op LLM turn (~$1/turn), where the agent reads a "NO LLM CALL"
+        // instruction in the Liquid template, posts a brief comment, and
+        // exits. Fire the auto-advance directly here and skip dispatch
+        // entirely — the next tick will pick up the issue in its new
+        // (specialist-owned) state.
+        if (!hasSpecialist && hasTransition) {
+          const nextState = this.lookupNextState(issue.state);
+          if (nextState) {
+            logger.info(
+              { issue: issue.identifier, fromState: issue.state, toState: nextState },
+              "transition-only state: firing auto-advance directly without dispatching",
             );
+            await this.deps.tracker
+              .transitionIssueToState(issue.id, nextState)
+              .catch((err) =>
+                logger.warn(
+                  { err: (err as Error).message, issue: issue.identifier },
+                  "transition-only auto-advance failed; will retry on next tick",
+                ),
+              );
+          }
           continue;
         }
 
