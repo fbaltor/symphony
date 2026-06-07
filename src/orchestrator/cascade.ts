@@ -55,7 +55,7 @@ const SUB_COMPLETED_STATES = new Set(["Done", "Canceled", "Duplicate"]);
  * in `Subtask drafted` (an unstarted state).
  */
 const DRAFTED_SUB_STATE = "Subtask drafted";
-const TO_IMPLEMENT_STATE = "To implement (manual)";
+const TO_IMPLEMENT_STATE = "To implement";
 
 /**
  * The state Symphony moves a parent into when all its subs are completed.
@@ -169,7 +169,7 @@ export async function runDevelopmentCascade(
       "",
       ...result.cascadedSubIdentifiers.map((id) => `- ${id}`),
       "",
-      "_Pick one, open it, paste its prompt into local Claude Code, and let it run autonomously._",
+      "_Symphony dispatches these automatically as each reaches `To implement` — it writes the code and opens a PR per sub. Review at the PR._",
     ].join("\n");
     await ctx.tracker.createComment(parent.id, body).catch((err) => {
       ctx.logger.warn(

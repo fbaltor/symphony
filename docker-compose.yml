@@ -39,6 +39,12 @@ services:
       # Mount your WORKFLOW.md into the container (comment out if you bake
       # it into the image via the Dockerfile COPY instead).
       - ./WORKFLOW.md:/app/WORKFLOW.md:ro
+      # before_run clone hook lives here (the runtime image only bakes in
+      # patch-claude-sdk.mjs). Mount the whole scripts DIR — a directory mount
+      # resolves filenames at open() time, so host edits to setup-workspace.sh
+      # go live without a recreate (a single-file mount pins the old inode).
+      # WORKFLOW.md hooks.before_run points at /app/scripts/setup-workspace.sh.
+      - ./scripts:/app/scripts:ro
       # Workspace storage for cloned repos (tmpfs alternative for long-lived
       # containers where workspaces should survive restarts).
       # - workspace_data:/tmp/symphony-workspaces

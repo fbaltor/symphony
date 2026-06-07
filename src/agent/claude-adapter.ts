@@ -157,7 +157,7 @@ export type ClaudeMcpServerOption =
 
 export type McpServersResolver = () => Promise<Record<string, ClaudeMcpServerOption>>;
 
-export type AgentEffort = "low" | "medium" | "high" | "max";
+export type AgentEffort = "low" | "medium" | "high" | "xhigh" | "max";
 
 export interface ClaudeAdapterOptions {
   model?: string;

@@ -1,4 +1,4 @@
-import { getInstallationToken } from "./github-auth.js";
+import { resolveGitHubToken } from "./github-auth.js";
 import {
   fetchBranches,
   fetchPullRequestForIssue,
@@ -74,7 +74,7 @@ export class GithubDeliverableSource implements DeliverableSource {
   constructor(opts: GithubDeliverableSourceOptions) {
     this.owner = opts.owner;
     this.repo = opts.repo;
-    this.tokenProvider = opts.tokenProvider ?? getInstallationToken;
+    this.tokenProvider = opts.tokenProvider ?? resolveGitHubToken;
   }
 
   async fetchBranches(): Promise<GithubBranchSummary[] | null> {

@@ -83,7 +83,7 @@ Re-plan idempotency rule. If the human re-drags Plan review (manual) → Technic
 
 Strict rules:
 
-- You do NOT have file write access. You do not open PRs, push branches, or run \`gh pr create\`. The PR title + body you write into each sub becomes the prompt for the local Claude Code agent that runs in Implementation (manual).
+- You do NOT have file write access. You do not open PRs, push branches, or run \`gh pr create\`. The PR title + body you write into each sub becomes the task spec for the autonomous implementation agent Symphony dispatches when the sub reaches \`To implement\` — it writes the code and opens the PR for that sub.
 - You do NOT transition the parent ticket. Do NOT call \`save_issue\` with the parent's id and a \`state\` field — the orchestrator handles parent → Plan review (manual) on success and the reconciler reverts unauthorized agent moves.
 - You do NOT post lifecycle / status comments to the parent beyond the single summary comment described above. Symphony's reconciler treats noisy lifecycle telemetry as a regression.
 - You do NOT touch unmanaged sections of any description. Only the 7 sections above are yours to write; everything else is the human's. When updating a sub's description, preserve any unmanaged content byte-for-byte.

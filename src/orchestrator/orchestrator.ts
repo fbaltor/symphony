@@ -10,7 +10,7 @@ import { computeBackoffMs, isEligible, sortForDispatch } from "./dispatch.js";
 import { reconcileStalledRuns, reconcileTrackerStates } from "./reconcile.js";
 import { ensureWorkspace } from "../workspace/manager.js";
 import { runHook } from "../workspace/hooks.js";
-import { getInstallationToken } from "../lib/github-auth.js";
+import { resolveGitHubToken } from "../lib/github-auth.js";
 import { branchMatchesIdentifier, type GithubBranchSummary } from "../lib/github.js";
 import type { DeliverableSource } from "../lib/deliverable-source.js";
 import { cleanupTerminalIssues, cleanupWorkspace } from "../workspace/cleanup.js";
@@ -671,7 +671,13 @@ export class Orchestrator {
           transitionEntry !== undefined &&
           this.currentConfig.tracker.stateTransitions[transitionEntry] !== "" &&
           this.currentConfig.tracker.stateTransitions[transitionEntry] !== null;
-        if (!hasSpecialist && !hasTransition) {
+        // Agent-dispatched states (e.g. "To implement"): no LLM specialist, but
+        // they SHOULD run an autonomous turn via the generic WORKFLOW envelope.
+        // They must bypass BOTH no-specialist skips below to reach dispatch().
+        const isAgentDispatched = this.currentConfig.tracker.agentDispatchedStates.some(
+          (s) => s.toLowerCase() === stateLower,
+        );
+        if (!isAgentDispatched && !hasSpecialist && !hasTransition) {
           logger.debug(
             { issue: issue.identifier, state: issue.state },
             "skipping dispatch: cascade-only state (no specialist, no auto-advance edge)",
@@ -688,7 +694,7 @@ export class Orchestrator {
         // exits. Fire the auto-advance directly here and skip dispatch
         // entirely — the next tick will pick up the issue in its new
         // (specialist-owned) state.
-        if (!hasSpecialist && hasTransition) {
+        if (!isAgentDispatched && !hasSpecialist && hasTransition) {
           const nextState = this.lookupNextState(issue.state);
           if (nextState) {
             logger.info(
@@ -1013,11 +1019,11 @@ export class Orchestrator {
           hookTimeoutMs: this.currentConfig.hooks.timeoutMs,
         },
       });
-      // Mint a GitHub App installation token once per dispatch attempt and
-      // pass it through to both hooks. Returns null when GH App env vars
-      // are absent — hooks then run without GITHUB_TOKEN, which is the
-      // expected behavior for placeholder / local-dev environments.
-      const githubToken = await getInstallationToken();
+      // Resolve a GitHub token once per dispatch attempt and pass it through
+      // to both hooks. Prefers a GH App installation token; falls back to a
+      // GITHUB_TOKEN PAT. Returns null when neither is configured — hooks then
+      // run without GITHUB_TOKEN (expected for placeholder / local-dev).
+      const githubToken = await resolveGitHubToken();
       const hookExtraEnv: Record<string, string | undefined> = githubToken
         ? { GITHUB_TOKEN: githubToken }
         : {};

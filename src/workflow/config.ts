@@ -96,6 +96,16 @@ const trackerCommonShape = {
      */
     prRequiredStates: z.array(z.string()).default(["Validate", "Implement", "Open PR", "Polish"]),
     /**
+     * Agent-dispatched states: states with NO LLM specialist that should
+     * STILL run an autonomous turn via the generic WORKFLOW.md template
+     * (e.g. "To implement"). Without this, the tick loop's no-specialist
+     * skips (cascade-only / transition-only) `continue` before dispatch(),
+     * so the state would never run an agent. Listed states bypass those two
+     * skips and reach dispatch() → buildSpecialistPrompt → null → WORKFLOW
+     * envelope. Specialist-owned states ignore this (they dispatch anyway).
+     */
+    agentDispatchedStates: z.array(z.string()).default([]),
+    /**
      * Maximum consecutive `outcome=Succeeded` turns where the deliverable
      * check fails before symphony moves the issue to `Error` (so a human
      * can intervene). Counter resets on a passing deliverable check or a
@@ -297,7 +307,7 @@ const agentRuntimeSchema = z
   .object({
     runtime: z.enum(["claude", "fake"]).default("claude"),
     model: z.string().min(1).optional(),
-    effort: z.enum(["low", "medium", "high", "max"]).optional(),
+    effort: z.enum(["low", "medium", "high", "xhigh", "max"]).optional(),
   })
   .default({ runtime: "claude" });
 
@@ -380,6 +390,7 @@ export function resolveConfig(raw: RawWorkflow, ctx: ResolveContext): SymphonyCo
       announceDispatch: pickBoolOptional(tracker.announce_dispatch ?? tracker.announceDispatch),
       announceOutcome: pickBoolOptional(tracker.announce_outcome ?? tracker.announceOutcome),
       prRequiredStates: tracker.pr_required_states ?? tracker.prRequiredStates,
+      agentDispatchedStates: tracker.agent_dispatched_states ?? tracker.agentDispatchedStates,
       noPrRetryLimit: pickNumber(tracker.no_pr_retry_limit ?? tracker.noPrRetryLimit, undefined),
       errorStates: tracker.error_states ?? tracker.errorStates,
       maxErrorRetries: pickNumber(tracker.max_error_retries ?? tracker.maxErrorRetries, undefined),

@@ -219,6 +219,31 @@ async function tryMintInstallationToken(url: string, jwt: string): Promise<MintO
   };
 }
 
+/**
+ * Resolve a GitHub token for both the workspace clone hook (injected as
+ * `GITHUB_TOKEN`) and the GitHub MCP bearer. Prefers a GitHub App installation
+ * token (short-lived, least-privilege); falls back to a long-lived
+ * `GITHUB_TOKEN` PAT from the env when no App is configured. The hosted GitHub
+ * MCP (`api.githubcopilot.com/mcp/`) and `git`/`gh` both accept a PAT as the
+ * bearer, so a fine-grained PAT scoped to the target repo (Contents + Pull
+ * requests: read/write) is sufficient for autonomous push + PR.
+ *
+ * Returns null only when neither an App nor a PAT is available — callers then
+ * skip the GitHub MCP and run the hook without `GITHUB_TOKEN`.
+ */
+export async function resolveGitHubToken(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string | null> {
+  const appToken = await getInstallationToken(env);
+  if (appToken) return appToken;
+  const pat = (env.GITHUB_TOKEN ?? "").trim();
+  if (pat) {
+    logger.info({}, "github.token.using_pat — no GH App configured; using GITHUB_TOKEN PAT");
+    return pat;
+  }
+  return null;
+}
+
 /** Test-only — flush the in-memory token cache between tests. */
 export function _resetGithubAuthCache(): void {
   cached = undefined;

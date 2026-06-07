@@ -1,5 +1,5 @@
 import { logger } from "../observability/logger.js";
-import { getInstallationToken } from "../lib/github-auth.js";
+import { resolveGitHubToken } from "../lib/github-auth.js";
 import { buildLinearMcpServer } from "./linear-mcp.js";
 import { isAgentToolProvider } from "./agent-tool-provider.js";
 import type { IssueTracker } from "../tracker/tracker.js";
@@ -110,7 +110,7 @@ export async function buildMcpServers(
   // First-party hosted MCP at https://api.githubcopilot.com/mcp/. Accepts
   // a GitHub installation token in the `Authorization: Bearer …` header.
   if (!opts.skipGithub) {
-    const ghToken = await getInstallationToken(env);
+    const ghToken = await resolveGitHubToken(env);
     if (ghToken) {
       out.github = {
         type: "http",
@@ -118,7 +118,10 @@ export async function buildMcpServers(
         headers: { Authorization: `Bearer ${ghToken}` },
       };
     } else {
-      logger.warn({}, "mcp.github.skipped — GH App credentials missing or token mint failed");
+      logger.warn(
+        {},
+        "mcp.github.skipped — no GH App creds and no GITHUB_TOKEN PAT; agent cannot push/PR",
+      );
     }
   }
 
