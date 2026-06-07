@@ -244,7 +244,7 @@ describe("Linear webhook receiver", () => {
 
     expect(tracker.transitionCalls).toContainEqual({
       issueId: "sub-1",
-      state: "To implement (manual)",
+      state: "To implement",
     });
 
     // Dedup INSERT must have run. (cascade pre-warm INSERT also fires async.)

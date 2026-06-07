@@ -73,7 +73,7 @@ SUITE("cascade dispatch (live Postgres for issue_metadata UPSERTs)", () => {
       ctx = { tracker: tracker as never, pool, logger };
     });
 
-    it("transitions every sub in 'Subtask drafted' to 'To implement (manual)'", async () => {
+    it("transitions every sub in 'Subtask drafted' to 'To implement'", async () => {
       tracker.childrenByParent.set(PARENT.id, [
         { id: "s1", identifier: "PROJ-101", title: "A", state: "Subtask drafted", description: null, url: null },
         { id: "s2", identifier: "PROJ-102", title: "B", state: "Subtask drafted", description: null, url: null },
@@ -86,7 +86,7 @@ SUITE("cascade dispatch (live Postgres for issue_metadata UPSERTs)", () => {
       expect(result.skippedSubIdentifiers).toEqual([]);
       expect(tracker.transitionCalls).toHaveLength(3);
       for (const call of tracker.transitionCalls) {
-        expect(call.state).toBe("To implement (manual)");
+        expect(call.state).toBe("To implement");
       }
 
       // Cleanup metadata rows
@@ -122,7 +122,7 @@ SUITE("cascade dispatch (live Postgres for issue_metadata UPSERTs)", () => {
       expect(body).toContain("Development cascade");
       expect(body).toContain("PROJ-101");
       expect(body).toContain("PROJ-102");
-      expect(body).toContain("To implement (manual)");
+      expect(body).toContain("To implement");
 
       await pool.query(`DELETE FROM symphony.issue_metadata WHERE issue_id = ANY($1)`, [["s1", "s2"]]);
     });

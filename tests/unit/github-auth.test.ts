@@ -4,6 +4,7 @@ import {
   buildAppJwt,
   normalizePrivateKey,
   readCredsFromEnv,
+  resolveGitHubToken,
 } from "../../src/lib/github-auth.js";
 
 /**
@@ -119,5 +120,26 @@ describe("getInstallationToken (cache)", () => {
   it("returns null when env is missing", async () => {
     const { getInstallationToken } = await import("../../src/lib/github-auth.js");
     expect(await getInstallationToken({})).toBeNull();
+  });
+});
+
+describe("resolveGitHubToken (App token, else GITHUB_TOKEN PAT)", () => {
+  beforeEach(() => {
+    _resetGithubAuthCache();
+  });
+
+  it("falls back to the GITHUB_TOKEN PAT when no GH App is configured", async () => {
+    // No GH App env vars → getInstallationToken returns null (no network) →
+    // resolveGitHubToken returns the PAT.
+    expect(await resolveGitHubToken({ GITHUB_TOKEN: "ghp_pat_value" })).toBe("ghp_pat_value");
+  });
+
+  it("trims surrounding whitespace on the PAT", async () => {
+    expect(await resolveGitHubToken({ GITHUB_TOKEN: "  gho_oauth_value\n" })).toBe("gho_oauth_value");
+  });
+
+  it("returns null when neither a GH App nor a PAT is available", async () => {
+    expect(await resolveGitHubToken({})).toBeNull();
+    expect(await resolveGitHubToken({ GITHUB_TOKEN: "   " })).toBeNull();
   });
 });
