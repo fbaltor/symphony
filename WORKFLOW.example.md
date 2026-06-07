@@ -73,6 +73,17 @@ tracker:
     - "PR validation"
     - "Release"
 
+  # Agent-dispatched states: states with NO LLM specialist that should STILL
+  # run an autonomous turn via the generic WORKFLOW template below — i.e.
+  # Symphony writes the code and opens the PR itself instead of a human pasting
+  # the sub's prompt into local Claude Code (the closed-loop / Path-A model).
+  # Without this, a no-specialist state is skipped (cascade-only or
+  # transition-only). List the implementation state here to activate it, give it
+  # workspace write (omit it from agent.write_cwds_by_state), and add it to
+  # pr_required_states. Leave empty for the manual coordinator model.
+  #   agent_dispatched_states:
+  #     - "To implement"
+
   # Announce dispatch/outcome in Linear comments (disable in dev environments
   # to avoid spamming tickets during testing).
   announce_dispatch: true
@@ -94,9 +105,11 @@ agent_runtime:
   # Required: which Claude model to use for non-specialist states.
   # Specialist agents (Prioritized, Technical plan, PR validation, Release)
   # use this model unless overridden.
-  model: claude-opus-4-7
-  # Optional: Anthropic adaptive-thinking effort level.
-  # Omit to use the SDK's default (medium).
+  model: claude-opus-4-8
+  # Optional: Anthropic adaptive-thinking effort level — low | medium | high |
+  # xhigh | max. Omit to use the SDK's default (medium). xhigh/high are best for
+  # coding/agentic work on Opus 4.7/4.8 but token-heavier (watch GET /usage);
+  # high is a good cost/quality balance.
   # effort: high
 
 github:
@@ -207,5 +220,20 @@ Turn: {{ attempt }}
 
 ## Your task
 
-Complete the work described above. Follow the project's AGENTS.md conventions.
-When done, post a summary comment on the Linear issue describing what you did.
+First read the repo's AGENTS.md / conventions docs in the workspace (they are
+NOT auto-loaded). Then implement the work described above.
+
+If this state is agent-dispatched (it opens a PR), you are NOT done until a pull
+request exists. Complete ALL of the following, in order, in THIS turn — do not
+stop or hand back before the PR is open:
+
+1. Implement the change and run the tests.
+2. `git checkout -b symphony/{{ issue.identifier | downcase }}` (or reuse it).
+3. `git add -A && git commit -m "<concise message>"`.
+4. `git push -u origin symphony/{{ issue.identifier | downcase }}`.
+5. Open a PR via the GitHub MCP (base = default branch, head = your branch).
+6. Post one short summary comment on the Linear issue.
+
+If tests fail or something is ambiguous, do NOT stop: push anyway and document
+the failure / trade-off in the PR body and the Linear comment. NEVER end the
+turn with uncommitted work.

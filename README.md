@@ -14,11 +14,13 @@ Symphony turns your Linear board into an autonomous engineering pipeline:
 
 1. A human moves a ticket to **Prioritized** — Symphony asks 5 clarifying questions.
 2. The human answers in comments — Symphony decomposes the ticket into sub-issues with full implementation prompts.
-3. The human reviews the plan and moves subs to **To implement (manual)**.
-4. The human pastes each sub's prompt into **local Claude Code** — the agent writes code, runs tests, opens a PR.
-5. The human confirms the PR is ready — Symphony validates CI, resolves review threads, squash-merges, and marks the sub Done.
+3. The human reviews the plan and moves subs toward implementation.
+4. Implementation runs one of two ways:
+   - **Coordinator (default):** the human pastes each sub's prompt into **local Claude Code** — the agent writes code, runs tests, opens a PR.
+   - **Closed-loop (opt-in, Path A):** list the implementation state in `agent_dispatched_states` and Symphony dispatches the sub itself — clones the repo via the `before_run` hook, writes the code, pushes a branch, and opens a PR, with **no manual paste**. See *Deviations* below.
+5. The human reviews/merges the PR — Symphony validates CI, resolves review threads, squash-merges, and marks the sub Done.
 
-The heavy lifting (running tests, opening PRs, iterating on bot reviews) happens in the human's local toolchain — Symphony handles the coordination, routing, and gating.
+In the coordinator model the heavy lifting runs in the human's local toolchain; in the closed-loop model Symphony runs it on the Claude Code subscription (OAuth) under the same guards (canUseTool, cost caps, PR-as-gate).
 
 ## 16-state pipeline
 
@@ -27,7 +29,7 @@ The heavy lifting (running tests, opening PRs, iterating on bot reviews) happens
 | Discovery | Backlog → **Prioritized** → Questions (manual) | agent + human |
 | Planning | **Technical plan** → Plan review (manual) | agent + human |
 | Cascade | **Development** → Subtask drafted / To implement (manual) | cascade |
-| Implementation | Implementation (manual) → Pull request | human (local Claude Code) |
+| Implementation | To implement → Pull request | human (paste) OR agent (`agent_dispatched_states`) |
 | Validation | Ready to deploy → **PR validation** | agent |
 | Shipping | **Release** → Done | agent |
 | Parent close | Validation (manual) → Done | cascade + human |
@@ -188,6 +190,7 @@ See [`docs/deploying.md`](docs/deploying.md) for Docker Compose and Cloud Run qu
 10. **Cooperative Linear GitHub auto-state.** Sub-issues move "Implementation (manual)" → "Pull request" on PR push and → "Done" on PR merge via Linear's native GitHub integration. Requires per-team `gitAutomationStateCreate` setup.
 11. **Claude coding agent instead of Codex.** The spec targets the Codex app-server (§3.3, §10) and names the agent runtime config the `codex` block (§5.3.6). Symphony ships a Claude adapter (`src/agent/claude-adapter.ts`) behind the spec's `AgentRunner` interface ([§10](docs/upstream-spec.md#10-agent-runner-protocol-coding-agent-integration)); no Codex adapter exists. `agentRuntime.runtime` selects the runner — `"claude"` (default, the real adapter) or `"fake"` (a scripted `FakeAgentRunner` in `src/agent/fake-runner.ts` for deterministic, zero-LLM testing). The audit/token model is agent-neutral (`input_tokens` / `output_tokens`, not the spec's `codex_*`). The `codex` config block is still accepted in `WORKFLOW.md`: the orchestrator consumes its `turn_timeout_ms` / `stall_timeout_ms`, while Codex-specific fields (`command`, `approval_policy`, sandbox modes) are inert under the Claude runtime.
 12. **In-memory test profile (`tracker.kind: memory`).** Alongside `kind: linear`, a `kind: memory` profile wires fully in-memory implementations of every external dependency — `MemoryTracker`, in-memory `MetadataStore`/`AuditSink`/`BudgetStore`, `MemoryDeliverableSource`, and a simulated `MemoryInstanceLock` (with an injectable `Clock`). A single composition root, `buildDeps(cfg)` (`src/deps.ts`), selects the whole profile from `tracker.kind`, so the orchestrator runs end-to-end in one process with no Linear, Postgres, GitHub, or LLM. See `tests/integration/e2e-memory-flow.test.ts`. This makes the spec's `IssueTracker` / `AgentRunner` seams (and Symphony's `*Store` / `DeliverableSource` / `InstanceLock` ports) concrete and swappable.
+13. **Closed-loop autonomous implementation (Path A).** The spec positions Symphony as a *coordinator* where the human pastes each sub's prompt into local Claude Code. Symphony can instead dispatch the implementation step itself: list a state in `tracker.agent_dispatched_states` and that no-specialist state runs the generic `WORKFLOW.md` template as an autonomous turn — clone via the `before_run` hook (`scripts/setup-workspace.sh`), write code, push a branch, and open a PR via the GitHub MCP, with no manual paste. GitHub auth resolves a GH App installation token or a `GITHUB_TOKEN` PAT (`resolveGitHubToken`, `src/lib/github-auth.ts`). Because deviation #10's Linear GitHub auto-state may be disabled, Symphony can advance the sub `To implement → Pull request` itself via `state_transitions`, gated on `pr_required_states` (a real branch/PR must exist). Runs on the Claude Code subscription (OAuth) under the same guards — `canUseTool`, cost caps, and the PR kept as the human review gate. Token + estimated-cost usage is exposed at `GET /usage`.
 
 ## License
 
