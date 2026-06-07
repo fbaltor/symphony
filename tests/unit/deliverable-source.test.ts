@@ -33,7 +33,7 @@ import type { Issue } from "../../src/types.js";
 function fakeIssue(overrides?: Partial<Issue>): Issue {
   return {
     id: "issue-441",
-    identifier: "AGENT-441",
+    identifier: "PROJ-441",
     title: "Test ticket",
     description: null,
     priority: null,
@@ -78,16 +78,16 @@ async function deliverablePresent(
 
 describe("MemoryDeliverableSource — branch presence (behavior 1)", () => {
   it("reports a matching scripted branch as present (gate => Succeeded / allowed)", async () => {
-    const issue = fakeIssue({ identifier: "AGENT-441" });
+    const issue = fakeIssue({ identifier: "PROJ-441" });
     const source = new MemoryDeliverableSource({
-      branches: [branch("main"), branch("symphony/agent-441")],
+      branches: [branch("main"), branch("symphony/proj-441")],
     });
 
     expect(await deliverablePresent(source, issue)).toBe(true);
   });
 
   it("reports NO matching branch as absent (gate => Failed / blocked)", async () => {
-    const issue = fakeIssue({ identifier: "AGENT-441" });
+    const issue = fakeIssue({ identifier: "PROJ-441" });
     const source = new MemoryDeliverableSource({
       branches: [branch("main"), branch("symphony/agent-999"), branch("hotfix/login")],
     });
@@ -106,12 +106,12 @@ describe("MemoryDeliverableSource — branch presence (behavior 1)", () => {
     // The presence decision is the pure util reused over scripted data, so
     // every pattern the real gate accepts must read present here too.
     const cases: Array<{ identifier: string; branchName: string }> = [
-      { identifier: "AGENT-441", branchName: "symphony/agent-441" },
-      { identifier: "AGENT-441", branchName: "symphony/agent-441-add-retry" },
-      { identifier: "AGENT-441", branchName: "agent-441" },
-      { identifier: "AGENT-441", branchName: "agent-441-fix" },
-      { identifier: "AGENT-441", branchName: "feat/agent-441-thing/wip" },
-      { identifier: "STG-17", branchName: "linear-suggested-stg-17-branch" },
+      { identifier: "PROJ-441", branchName: "symphony/proj-441" },
+      { identifier: "PROJ-441", branchName: "symphony/proj-441-add-retry" },
+      { identifier: "PROJ-441", branchName: "agent-441" },
+      { identifier: "PROJ-441", branchName: "agent-441-fix" },
+      { identifier: "PROJ-441", branchName: "feat/agent-441-thing/wip" },
+      { identifier: "PROJ-17", branchName: "linear-suggested-proj-17-branch" },
     ];
     for (const { identifier, branchName } of cases) {
       const source = new MemoryDeliverableSource({ branches: [branch(branchName)] });
@@ -124,8 +124,8 @@ describe("MemoryDeliverableSource — branch presence (behavior 1)", () => {
     // Falsifiable guard: the matcher is a standalone export, not a method on
     // the interface. If a future refactor moves it onto DeliverableSource,
     // this import-and-call breaks.
-    expect(branchMatchesIdentifier("symphony/agent-441", "AGENT-441")).toBe(true);
-    expect(branchMatchesIdentifier("main", "AGENT-441")).toBe(false);
+    expect(branchMatchesIdentifier("symphony/proj-441", "PROJ-441")).toBe(true);
+    expect(branchMatchesIdentifier("main", "PROJ-441")).toBe(false);
     const source = new MemoryDeliverableSource({ branches: [] });
     expect(
       (source as unknown as Record<string, unknown>).branchMatchesIdentifier,
@@ -149,7 +149,7 @@ describe("MemoryDeliverableSource — PR for issue (behavior 1, Release-stage pa
     const source = new MemoryDeliverableSource({
       branches: [],
       prsByIssue: {
-        "STG-42": {
+        "PROJ-42": {
           number: 42,
           mergedAt: "2026-05-07T18:00:00Z",
           state: "closed",
@@ -159,7 +159,7 @@ describe("MemoryDeliverableSource — PR for issue (behavior 1, Release-stage pa
       },
     });
 
-    const pr = await source.fetchPullRequestForIssue("STG-42");
+    const pr = await source.fetchPullRequestForIssue("PROJ-42");
     expect(pr).not.toBeNull();
     expect(pr).not.toBeUndefined();
     expect(pr!.number).toBe(42);
@@ -171,7 +171,7 @@ describe("MemoryDeliverableSource — PR for issue (behavior 1, Release-stage pa
     const source = new MemoryDeliverableSource({
       branches: [],
       prsByIssue: {
-        "STG-42": {
+        "PROJ-42": {
           number: 42,
           mergedAt: null,
           state: "open",
@@ -181,7 +181,7 @@ describe("MemoryDeliverableSource — PR for issue (behavior 1, Release-stage pa
       },
     });
 
-    expect(await source.fetchPullRequestForIssue("STG-99")).toBeNull();
+    expect(await source.fetchPullRequestForIssue("PROJ-99")).toBeNull();
   });
 
   it("returns undefined when scripted as inconclusive (transient => fail open)", async () => {
@@ -189,9 +189,9 @@ describe("MemoryDeliverableSource — PR for issue (behavior 1, Release-stage pa
     // as fail-open; the memory source can script it per identifier.
     const source = new MemoryDeliverableSource({
       branches: [],
-      prsByIssue: { "STG-17": undefined },
+      prsByIssue: { "PROJ-17": undefined },
     });
 
-    expect(await source.fetchPullRequestForIssue("STG-17")).toBeUndefined();
+    expect(await source.fetchPullRequestForIssue("PROJ-17")).toBeUndefined();
   });
 });

@@ -8,7 +8,7 @@ import {
 /**
  * Task 2 (2026-05-06) — audit reconciliation regression suite.
  *
- * AGENT-521 demonstrated the cost-truth gap: 6 OOM'd Implement
+ * PROJ-521 demonstrated the cost-truth gap: 6 OOM'd Implement
  * dispatches produced ZERO audit rows because the OOM kill happened
  * before the `runWorker` finally block could fire. Real Anthropic
  * spend ($5–$15) was therefore invisible to `/cost`.
@@ -70,7 +70,7 @@ describe("recordRunStart / recordRunEnd", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await recordRunStart(pool as any, {
       issueId: "issue-uuid-1",
-      issueIdentifier: "AGENT-521",
+      issueIdentifier: "PROJ-521",
       instanceId: "rev-00020-r5k-abc",
       attempt: 1,
       sessionId: "session-xyz",
@@ -81,7 +81,7 @@ describe("recordRunStart / recordRunEnd", () => {
     expect(sql).toContain("ON CONFLICT");
     expect(pool.query.mock.calls[0]?.[1]).toEqual([
       "issue-uuid-1",
-      "AGENT-521",
+      "PROJ-521",
       "rev-00020-r5k-abc",
       1,
       "session-xyz",
@@ -94,7 +94,7 @@ describe("recordRunStart / recordRunEnd", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       recordRunStart(pool as any, {
         issueId: "issue-1",
-        issueIdentifier: "AGENT-521",
+        issueIdentifier: "PROJ-521",
         instanceId: "rev-00020-r5k-abc",
         attempt: 1,
         sessionId: null,
@@ -140,7 +140,7 @@ describe("reapOrphanedRuns", () => {
       rows: [
         {
           issue_id: "agent-521-uuid",
-          issue_identifier: "AGENT-521",
+          issue_identifier: "PROJ-521",
           instance_id: "rev-00020-r5k-abc",
           attempt: 1,
           session_id: "session-1",
@@ -148,7 +148,7 @@ describe("reapOrphanedRuns", () => {
         },
         {
           issue_id: "agent-522-uuid",
-          issue_identifier: "AGENT-522",
+          issue_identifier: "PROJ-522",
           instance_id: "rev-00020-r5k-abc",
           attempt: 2,
           session_id: null,
@@ -165,14 +165,14 @@ describe("reapOrphanedRuns", () => {
       String(c[0] ?? "").includes("INSERT INTO run_audit"),
     );
     expect(auditCalls).toHaveLength(2);
-    // First audit row params (post B-3 / D-21): outcome at index 6,
+    // First audit row params: outcome at index 6,
     // cost_usd at 12, error at 13, prompt_version at 14,
     // cache_creation_input_tokens at 15, cache_read_input_tokens at 16,
     // extra at 17. The two cache columns were appended before extra so
     // the `extra` JSONB stays at the tail; older rows (orphan reaper)
     // pass through 0-defaults for the cache columns.
     const firstParams = (auditCalls[0]?.[1] as unknown[]) ?? [];
-    expect(firstParams[1]).toBe("AGENT-521"); // issue_identifier
+    expect(firstParams[1]).toBe("PROJ-521"); // issue_identifier
     expect(firstParams[6]).toBe("Killed"); // outcome
     expect(firstParams[12]).toBe(0); // cost_usd
     expect(String(firstParams[13])).toContain("container died");

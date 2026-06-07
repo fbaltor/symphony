@@ -31,7 +31,7 @@ import type { SymphonyConfig } from "./workflow/config.js";
 // (pool.on, client.on) are preferred; these handlers catch the ones we
 // missed.
 //
-// Per IMPROVEMENTS.md S-D3 / A-3: log fatal + exit(1). Cloud Run restarts
+// On an uncaught error: log fatal + exit(1). Cloud Run restarts
 // the revision; the singleton-lock lease (15s) ages out before the new
 // instance reclaims it, so the brief downtime is bounded. The previous
 // "swallow forever" behavior risked a wedged process that kept logging
@@ -53,7 +53,7 @@ process.on("unhandledRejection", (reason) => {
 });
 
 async function main(): Promise<void> {
-  // B-15 follow-up: identify Symphony to upstream APIs. Anthropic logs the
+  // Identify Symphony to upstream APIs (see docs/adr/0021). Anthropic logs the
   // `CLAUDE_AGENT_SDK_CLIENT_APP` env value alongside each request — letting
   // an operator filter Anthropic dashboard usage by build identifier. Set
   // BEFORE the first SDK import (the SDK reads env at module-load time, not
@@ -77,15 +77,15 @@ async function main(): Promise<void> {
   let configRef: SymphonyConfig | null = null;
   let instanceIdRef: string | null = null;
   let watcherRef: WorkflowWatcher | null = null;
-  // E-17 / E-18: tracker reference shared with the `/webhook/linear` receiver.
+  // tracker reference shared with the `/webhook/linear` receiver.
   // Bootstrap may not have constructed it yet when the first webhook lands;
   // the receiver returns 503 in that window so Linear retries.
   let trackerRef: LinearTrackerClient | null = null;
-  // A-32: gate for the POST /admin/reload route. Empty / unset = route
+  // gate for the POST /admin/reload route. Empty / unset = route
   // returns 503 ("admin_disabled"); set to a strong random token in
   // Cloud Run env to enable.
   const adminToken = (process.env.SYMPHONY_ADMIN_TOKEN ?? "").trim() || null;
-  // E-17 / E-18: Linear webhook HMAC secret. Operator pastes the value Linear
+  // Linear webhook HMAC secret. Operator pastes the value Linear
   // shows in their webhook config UI into the GCP Secret Manager secret
   // `symphony-linear-webhook-secret` (Pulumi-provisioned). When unset
   // (placeholder secret), the `/webhook/linear` route returns 503 and
@@ -136,7 +136,7 @@ async function main(): Promise<void> {
   let pool;
   let lockHandle;
   let orchestrator: Orchestrator;
-  // AGENT-520: forward-reference the shutdown trigger so the lock module's
+  // forward-reference the shutdown trigger so the lock module's
   // heartbeat tick can fire it when another instance requests a handoff.
   // Assigned below after `shutdown` is defined; calls before then are no-ops
   // (the only caller is the heartbeat poll, which can only fire AFTER
@@ -176,7 +176,7 @@ async function main(): Promise<void> {
     // `acquireInstanceLock`, so the real boot path is identical.
     lockHandle = await deps.lock.acquire({
       onHandoffRequested: () => {
-        // AGENT-520: another Cloud Run revision is asking us to step down.
+        // another Cloud Run revision is asking us to step down.
         // Re-use the existing SIGTERM-driven shutdown path (drain workers
         // gracefully, release lock early so the new revision can boot).
         // The deref is null until `shutdown` is defined below; in practice
@@ -193,11 +193,11 @@ async function main(): Promise<void> {
     }
     instanceIdRef = lockHandle.instanceId;
 
-    // Task 2 (2026-05-06): orphan-run reaper. Find `running_runs` rows
+    // Orphan-run reaper. Find `running_runs` rows
     // from a previous instance (whose container died before its worker
     // could write an audit row) and write synthetic `outcome=Killed`
     // audit rows so `/cost` and ops dashboards reflect the cost-truth
-    // surfaced by AGENT-521.
+    // surfaced in production.
     //
     // Best-effort — failure here does NOT block boot (we've already
     // acquired the lock; observability gap is recoverable on next
@@ -209,12 +209,12 @@ async function main(): Promise<void> {
     }
 
     const tracker = deps.tracker as LinearTrackerClient;
-    // E-17 / E-18: publish the tracker to the HTTP route closure so the
+    // publish the tracker to the HTTP route closure so the
     // `/webhook/linear` receiver can drive cascades via the same client
     // the poll loop uses (token, scope, retry semantics all match).
     trackerRef = tracker;
 
-    // A-16 / S-D13 (Task 2): one-shot lookup of the bot's own Linear
+    // One-shot lookup of the bot's own Linear
     // user id. The reconciler reads this via `tracker.getViewerId()` to
     // distinguish bot-driven moves (revert candidate) from human-driven
     // moves (must NOT be reverted). Best-effort — failure leaves
@@ -232,7 +232,7 @@ async function main(): Promise<void> {
 
     orchestrator = new Orchestrator({
       ...deps,
-      // Task 2 (2026-05-06): instance ID flows into the orchestrator so
+      // Instance ID flows into the orchestrator so
       // each worker writes a `running_runs` row tagged with this
       // revision's identity. The orphan reaper above ran BEFORE this
       // point and already wrote synthetic Killed audit rows for any rows
@@ -252,7 +252,7 @@ async function main(): Promise<void> {
   }
 
   let shuttingDown = false;
-  // `signal` is widened from NodeJS.Signals to include AGENT-520's "handoff"
+  // `signal` is widened from NodeJS.Signals to include the "handoff"
   // pseudo-signal. The handoff path is identical to SIGTERM otherwise — we
   // just want the log line to make the cause clear in the gcloud trail.
   const shutdown = async (signal: NodeJS.Signals | "handoff") => {
@@ -272,7 +272,7 @@ async function main(): Promise<void> {
     // Validate + clamp: a misset env var (negative, NaN, "abc", or
     // "0") would otherwise turn into an invalid drain timeout and the
     // gracefulStop loop would skip its drain entirely, aborting every
-    // in-flight turn immediately. Surfaced by CodeRabbit on PR #502.
+    // in-flight turn immediately. Surfaced by CodeRabbit review.
     const DEFAULT_DRAIN_MS = 540_000;
     const MAX_DRAIN_MS = 600_000; // Cloud Run platform max for grace period
     const rawDrainEnv = process.env.SYMPHONY_DRAIN_TIMEOUT_MS;
@@ -364,7 +364,7 @@ async function main(): Promise<void> {
   };
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   process.on("SIGINT", () => void shutdown("SIGINT"));
-  // AGENT-520: wire the lock module's heartbeat-tick handoff signal to
+  // wire the lock module's heartbeat-tick handoff signal to
   // the same shutdown path. The heartbeat tick can only fire AFTER
   // acquireInstanceLock returned (which it has, by the time we reach
   // here), but the closure passed to acquireInstanceLock has been
@@ -375,11 +375,11 @@ async function main(): Promise<void> {
   await orchestrator.start();
   bootstrapReady = true;
 
-  // E-18 follow-up: webhook dedup table cleanup. Linear retries failed
+  // Webhook dedup table cleanup. Linear retries failed
   // deliveries for up to 24h on 5xx, so the table needs at least a 24h
   // retention window. Without periodic cleanup the table grows unbounded
   // (~few thousand rows/day at current volume — acceptable short-term but
-  // not forever). Surfaced 2026-05-07 by Copilot review on PR #684.
+  // not forever). Surfaced by Copilot review (2026-05-07).
   //
   // Run once on boot (catches up after a long downtime) and then every
   // hour. Best-effort: pruneWebhookDedup() already catches and logs its
@@ -413,7 +413,7 @@ async function main(): Promise<void> {
   const startedSnap = watcher.snapshot().config;
   logger.info(
     {
-      // B-15: surface build provenance in the boot banner so the first
+      // surface build provenance in the boot banner so the first
       // log line after a deploy unambiguously names the running binary.
       version: SYMPHONY_VERSION,
       gitSha: readGitSha(),

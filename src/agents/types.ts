@@ -1,21 +1,21 @@
 /**
- * Specialist agent contract — §8 / E-10..E-15 of IMPROVEMENTS.md.
+ * Specialist agent contract for the 16-state pipeline (see docs/adr/0010).
  *
  * Each specialist agent in Symphony's 16-state pipeline owns:
- *   1. A `SYSTEM_PROMPT` string (per §10's "prompts in code" pattern; B-2's
- *      `prompt_version` provenance).
+ *   1. A `SYSTEM_PROMPT` string (per the spec's "prompts in code" pattern; the
+ *      `prompt_version` provenance — see docs/adr/0022).
  *   2. A `buildUserMessage(ctx)` function that assembles the per-turn user
  *      message from issue + comments + Postgres metadata.
  *   3. A `run(ctx)` function that the orchestrator dispatches when an issue
  *      enters the specialist's owned state.
  *
  * The orchestrator does NOT pass the rendered WORKFLOW.md template to
- * specialists; specialists own their full prompt. WORKFLOW.staging.md's
+ * specialists; specialists own their full prompt. WORKFLOW.md's
  * Liquid envelope is fallback only — used for unknown states or human-review
  * states where the dispatch path isn't a specialist.
  *
  * Cost accounting: every specialist's `run()` calls `recordSpecialistRun()`
- * with its own `iterationKey` so the §8 / E-6 counters stay accurate.
+ * with its own `iterationKey` so the per-iteration counters stay accurate.
  */
 
 import type { MetadataStore } from "../audit/store.js";
@@ -56,7 +56,7 @@ export interface SpecialistContext {
   tracker: IssueTracker;
   /**
    * Workspace path on disk where the cloned monorepo lives. Specialists
-   * don't write files (per WORKFLOW.staging.md `write_cwds_by_state: []`),
+   * don't write files (per WORKFLOW.md `write_cwds_by_state: []`; docs/adr/0017),
    * but they do `Read` / `Grep` to gather context.
    */
   workspacePath: string;
@@ -111,7 +111,7 @@ export interface SpecialistResult {
    * field will be honored as a primary signal alongside the Decision-line
    * fallback.
    *
-   * Surfaced 2026-05-07 by Copilot review on PR #684.
+   * Surfaced by Copilot review (2026-05-07).
    */
   nextStateOverride?: string | null;
   /** Optional Linear comment text the orchestrator posts on the issue. */
@@ -137,7 +137,7 @@ export interface Specialist {
   systemPrompt: string;
   /**
    * Stable identifier for the prompt's content hash, recorded into
-   * symphony.run_audit.prompt_version (B-2). Set at module import using
+   * symphony.run_audit.prompt_version. Set at module import using
    * the git SHA of the build (so a regression to a specific prompt
    * version is post-hoc analyzable).
    */

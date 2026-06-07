@@ -5,7 +5,7 @@ vi.mock("../../src/observability/logger.js", () => ({
   withContext: () => ({ warn: vi.fn(), info: vi.fn(), debug: vi.fn(), error: vi.fn() }),
 }));
 
-describe("AsyncQueue — A-22 foundation", () => {
+describe("AsyncQueue", () => {
   it("delivers events pushed before iteration starts", async () => {
     const { AsyncQueue } = await import("../../src/agent/event-queue.js");
     const q = new AsyncQueue<number>();

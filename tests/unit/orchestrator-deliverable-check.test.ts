@@ -18,7 +18,7 @@ import {
 import type { GithubBranchSummary } from "../../src/lib/github.js";
 
 /**
- * Regression suite for the AGENT-441 / AGENT-439 false-positive Code Review
+ * Regression suite for the PROJ-441 / PROJ-439 false-positive Code Review
  * auto-advance bug (2026-04-29). Both issues reached `Code Review` with empty
  * branch state because their Validate-stage agents converged on a no-op
  * pattern, the SDK reported `outcome=Succeeded`, and the orchestrator
@@ -80,7 +80,7 @@ function makeConfig(overrides?: Partial<SymphonyConfig["tracker"]>): SymphonyCon
 function fakeIssue(overrides?: Partial<Issue>): Issue {
   return {
     id: "issue-441",
-    identifier: "AGENT-441",
+    identifier: "PROJ-441",
     title: "Test ticket",
     description: null,
     priority: null,
@@ -120,7 +120,7 @@ function makeOrchestrator(
   const tracker = {
     createComment: vi.fn(async () => ({ id: "c1", url: "" })),
     transitionIssueToState: vi.fn(async (_id: string, state: string) => ({
-      identifier: "AGENT-441",
+      identifier: "PROJ-441",
       state,
     })),
   };
@@ -287,13 +287,13 @@ describe("orchestrator deliverable check", () => {
   });
 
   /*
-   * Bug F (AGENT-512) regression suite — `<!-- symphony:no-pr-required -->`
+   * Deliverable-gate regression suite — `<!-- symphony:no-pr-required -->`
    * marker opts a behavioural-probe ticket out of the deliverable check.
-   * Closes the loop where T-017 v2 (AGENT-504) cycled through Plan →
+   * Closes the loop where a redaction probe cycled through Plan →
    * Implement → escalate-to-Error indefinitely because the test deliverable
    * is a Linear comment, not a PR.
    */
-  describe("no-pr-required marker (Bug F)", () => {
+  describe("no-pr-required marker", () => {
     it("skips the branch check when the body has the marker", async () => {
       const { orchestrator, tracker } = makeOrchestrator(makeConfig());
       // checkDeliverableExists must NOT be called — fail loudly if it is.
@@ -301,7 +301,7 @@ describe("orchestrator deliverable check", () => {
         throw new Error("checkDeliverableExists should be short-circuited by the marker");
       };
       const issue = fakeIssue({
-        description: "## T-017 v2 — redaction probe\n\n<!-- symphony:no-pr-required -->",
+        description: "## Redaction probe\n\n<!-- symphony:no-pr-required -->",
       });
       const res = await privateGate(orchestrator).deliverableGate(issue, "Validate");
       expect(res).toEqual({ allowed: true });

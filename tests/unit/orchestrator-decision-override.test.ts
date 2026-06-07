@@ -1,5 +1,5 @@
 /**
- * Integration tests for the §8 / E-15, E-16 nextStateOverride wiring.
+ * Integration tests for the nextStateOverride wiring.
  *
  * The orchestrator's auto-advance block (in `runWorker`'s finally) reads the
  * fresh issue description after a successful turn and parses the agent's

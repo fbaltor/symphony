@@ -1,5 +1,5 @@
 /**
- * Release specialist prompt (§8 / E-15 of IMPROVEMENTS.md).
+ * Release specialist prompt for the 16-state pipeline (see docs/adr/0010).
  *
  * Fires after PR validation green-lights a sub. The Release agent's job is to
  * land the merge and watch main CI: re-verify CI is green on the PR head SHA,

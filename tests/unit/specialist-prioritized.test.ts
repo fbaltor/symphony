@@ -1,5 +1,5 @@
 /**
- * Unit tests for the Prioritized specialist module (§8 / E-11).
+ * Unit tests for the Prioritized specialist module.
  *
  * Coverage:
  *   - SYSTEM_PROMPT shape (non-empty, mentions Prioritized + the 3 sections)
@@ -30,7 +30,7 @@ import type { Issue } from "../../src/types.js";
 function fakeIssue(overrides: Partial<Issue> = {}): Issue {
   return {
     id: "11111111-1111-1111-1111-111111111111",
-    identifier: "STG-9999",
+    identifier: "PROJ-9999",
     title: "Add a logout-confirmation modal to legal-admin",
     description: "When the user clicks logout, ask them to confirm.",
     priority: 2,
@@ -63,7 +63,7 @@ function fakeCtx(overrides: Partial<SpecialistContext> = {}): SpecialistContext 
     comments: [],
     store: null as unknown as MetadataStore,
     tracker: null as unknown as SpecialistContext["tracker"],
-    workspacePath: "/tmp/symphony-workspaces/STG-9999",
+    workspacePath: "/tmp/symphony-workspaces/PROJ-9999",
     logger: noopLogger,
     abortController: new AbortController(),
     ...overrides,
@@ -103,11 +103,11 @@ describe("Prioritized specialist — buildUserMessage", () => {
   it("includes the issue identifier and title in the header", () => {
     const ctx = fakeCtx({ issue: fakeIssue() });
     const out = buildUserMessage(ctx);
-    expect(out).toContain("STG-9999");
+    expect(out).toContain("PROJ-9999");
     expect(out).toContain("Add a logout-confirmation modal to legal-admin");
     // Sanity: header should be the very first line.
     expect(out.split("\n")[0]).toBe(
-      "# Prioritized turn for STG-9999 — Add a logout-confirmation modal to legal-admin",
+      "# Prioritized turn for PROJ-9999 — Add a logout-confirmation modal to legal-admin",
     );
   });
 

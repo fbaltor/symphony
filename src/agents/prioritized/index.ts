@@ -1,5 +1,5 @@
 /**
- * Prioritized specialist module — §8 / E-11 of IMPROVEMENTS.md.
+ * Prioritized specialist module for the 16-state pipeline (see docs/adr/0010).
  *
  * Phase 2.5 will land the LLM-driven body of `run()`. For now, the run() is
  * a stub that bumps the `validation_iteration` counter via
@@ -36,7 +36,7 @@ import { SYSTEM_PROMPT, buildUserMessage } from "./prompt.js";
 export const NAME = "prioritized" as const;
 
 /**
- * Linear state this specialist owns. Must match WORKFLOW.staging.md
+ * Linear state this specialist owns. Must match WORKFLOW.md
  * `tracker.active_states` and the `state_transitions` map's source state.
  */
 export const STATE = "Prioritized" as const;

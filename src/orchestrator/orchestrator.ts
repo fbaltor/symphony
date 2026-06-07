@@ -96,7 +96,7 @@ export interface OrchestratorDeps {
 /**
  * Shape returned by `Orchestrator.snapshot()`. Consumed by the `/status`
  * HTTP route in `src/main.ts`. Field names use snake_case because they're
- * serialized straight to JSON over an HTTP API surface (cerebro convention).
+ * serialized straight to JSON over an HTTP API surface.
  *
  * `instance_id` is NOT included here — the orchestrator doesn't know its
  * singleton-lock identity. The HTTP handler in `main.ts` merges that field
@@ -131,8 +131,8 @@ export interface OrchestratorSnapshot {
 }
 
 /**
- * Bug F (AGENT-512): behavioural-probe tickets have no PR by design — the
- * deliverable IS a Linear comment (e.g. T-017 v2 redaction probe). Without
+ * Behavioural-probe tickets have no PR by design (see docs/adr/0019) — the
+ * deliverable IS a Linear comment (e.g. a redaction probe). Without
  * an opt-out, the deliverable-gate loops these tickets through warn →
  * escalate-to-Error → re-dispatch, burning ~$1.20 per cycle.
  *
@@ -190,15 +190,15 @@ export class Orchestrator {
    * `tracker.noPrRetryLimit` (default 3) consecutive misses we move the
    * issue to `Error` so a human can intervene.
    *
-   * Closes the bug observed on AGENT-441 + AGENT-439 (2026-04-29) where
+   * Closes the bug observed on  +  (2026-04-29) where
    * the orchestrator auto-advanced to `Code Review` despite the agent
    * never pushing a branch.
    */
   private noDeliverableCount: Map<string, number> = new Map();
   /**
-   * Bug D fix (AGENT-490): when the deliverable-gate escalation tries to
+   * When the deliverable-gate escalation tries to
    * transition the issue to `Error` and the Linear team doesn't have an
-   * `Error` state (Cerebro team currently has none — `error_states: []`
+   * `Error` state (a team may have none — `error_states: []`
    * in WORKFLOW.md), the transition fails silently and `noDeliverableCount`
    * resets. Without this map, the orchestrator would re-dispatch the same
    * issue every poll forever, each dispatch costing ~$1.20 because the
@@ -224,11 +224,11 @@ export class Orchestrator {
    * Linear comment. Cleared on dispatch / worker exit so a new
    * dispatch starts with a fresh baseline.
    *
-   * Closes the gate-bypass observed on AGENT-447 (2026-04-29) where
+   * Closes the gate-bypass observed on  (2026-04-29) where
    * the agent moved Plan → Implement itself, skipping the configured
    * RFC review gate.
    */
-  // A-17 / S-D14: lastSeenState is a write-through Map backed by
+  // lastSeenState is a write-through Map backed by
   // `symphony.review_gate_state`. Constructed in the constructor; loaded
   // from DB in `start()` so cross-restart state survives Cloud Run revision
   // rollovers (closes the ~30s post-boot window where the reconciler had
@@ -236,7 +236,7 @@ export class Orchestrator {
   private readonly reviewGateStore: ReviewGateStore;
   private lastSeenState: WriteThroughLastSeenMap;
   /**
-   * A-18: per-issue revert-timestamp tracker. The reconciler pushes a
+   * per-issue revert-timestamp tracker. The reconciler pushes a
    * timestamp every time it reverts an unauthorized review-gate move; if
    * an issue accumulates >3 entries within the last hour, the reconciler
    * escalates to `tracker.errorStates[0]` instead of reverting again.
@@ -248,7 +248,7 @@ export class Orchestrator {
    * Per-issue snapshot of the last state observed in `tick()` across ALL
    * polled candidates (not just running ones — see `lastSeenState` for
    * that). Used to detect parent state changes that fire cascade flows
-   * (§8 / E-9, E-13, E-16): when an issue transitions into a cascade
+   * When an issue transitions into a cascade
    * trigger state (currently `Development` for the development cascade)
    * we fire the cascade once per transition.
    *
@@ -281,7 +281,7 @@ export class Orchestrator {
 
   async start(): Promise<void> {
     this.unsubscribeReload = this.deps.watcher.onChange((s) => this.applyReload(s));
-    // A-17: restore lastSeenState from `symphony.review_gate_state` so the
+    // restore lastSeenState from `symphony.review_gate_state` so the
     // first reconciler tick after a Cloud Run rollover has a real `prev`
     // to compare against. Best-effort: load failures fall back to an empty
     // map and the reconciler rebuilds it on subsequent ticks.
@@ -424,7 +424,7 @@ export class Orchestrator {
     this.currentTemplate = snapshot.raw.promptTemplate;
     this.state.pollIntervalMs = snapshot.config.polling.intervalMs;
     this.state.maxConcurrentAgents = snapshot.config.agent.maxConcurrentAgents;
-    // A-13 / S-D11: drop any cached Linear team-states so the next
+    // drop any cached Linear team-states so the next
     // transitionIssueToState call picks up freshly-added states without a
     // daemon restart. Cheap (no I/O) and prevents `linear_state_not_found`
     // errors after an operator edits WORKFLOW.md to add a new state.
@@ -517,7 +517,7 @@ export class Orchestrator {
         // automatic forward edge — e.g. "Subtask drafted", which is
         // moved exclusively by the Development cascade). A null here
         // means there's no terminal hand-off pattern to protect.
-        // Surfaced by Copilot review on PR #684.
+        // Surfaced by Copilot review.
         if (typeof v !== "string") return false;
         return terminalLower.includes(v.toLowerCase());
       }
@@ -544,7 +544,7 @@ export class Orchestrator {
         humanReviewStates: this.currentConfig.tracker.humanReviewStates,
         stateTransitions: this.currentConfig.tracker.stateTransitions,
         lastSeenState: this.lastSeenState,
-        // A-18: revert-rate-limit telemetry; reconciler escalates to
+        // revert-rate-limit telemetry; reconciler escalates to
         // `errorStates[0]` after >3 reverts in 1h to break busy-loop.
         recentRevertTimestampsMs: this.recentRevertTimestamps,
         errorStates: this.currentConfig.tracker.errorStates,
@@ -565,7 +565,7 @@ export class Orchestrator {
         // the worker hangs past stallTimeoutMs.
         isProtectedTerminalIssue: (issueId: string) =>
           this.isProtectedTerminalIssue(issueId),
-        // A-16 / S-D13 (Task 2): pass the bot's Linear user id + pool
+        // Pass the bot's Linear user id + pool (see docs/adr/0020)
         // so the reconciler can consult `symphony.issue_state_actor`
         // and skip the revert when a human dragged the ticket. Both
         // are optional — when fetchViewerId() failed at boot the
@@ -580,7 +580,7 @@ export class Orchestrator {
       const validation = preflightValidate(this.currentConfig);
       if (validation) {
         logger.error({ reason: validation }, "dispatch preflight validation failed; skipping tick");
-        // B-8: rate-limited Slack alert. Without dampening a misconfigured
+        // rate-limited Slack alert. Without dampening a misconfigured
         // WORKFLOW.md would log this every tick (~5-15s) until manual fix.
         await this.deps.slack.announceRejection({
           kind: "preflight_failed",
@@ -590,7 +590,7 @@ export class Orchestrator {
         return;
       }
 
-      // B-13: kill-switch gate. When engaged, log + skip dispatch.
+      // kill-switch gate. When engaged, log + skip dispatch.
       // Reconciliation already ran above, so in-flight workers continue
       // to drain naturally. Operators flip via POST /admin/kill-switch.
       const kill = await readKillSwitch(this.deps.pool);
@@ -603,7 +603,7 @@ export class Orchestrator {
           },
           "kill-switch engaged; skipping dispatch this tick",
         );
-        // B-8: rate-limited Slack alert. Tick-frequency is ~5-15s so without
+        // rate-limited Slack alert. Tick-frequency is ~5-15s so without
         // dampening this would post 12+ times per minute while engaged.
         await this.deps.slack.announceRejection({
           kind: "kill_switch",
@@ -624,7 +624,7 @@ export class Orchestrator {
         return;
       }
 
-      // §8 / E-9, E-13: cascade trigger detection. Run BEFORE dispatch so
+      // Cascade trigger detection. Run BEFORE dispatch so
       // that a parent landing in `Development` fans its subs out to
       // `To implement (manual)` before any other side effect of this tick.
       // The cascade itself is fire-and-forget at the orchestrator level —
@@ -652,14 +652,14 @@ export class Orchestrator {
         });
         if (!elig.ok) continue;
 
-        // §8 / E-13 cascade-only states: states that are in `active_states`
+        // Cascade-only states: states that are in `active_states`
         // (so the orchestrator visits them on each tick to fire cascade
         // logic via detectAndFireCascades above) but have NO LLM specialist
         // and NO state_transitions edge. Development is the canonical
         // example — it triggers a sub fan-out via runDevelopmentCascade,
         // but no LLM turn should run on the parent. Without this skip the
         // orchestrator falls through to buildSpecialistPrompt → null →
-        // legacy WORKFLOW.staging.md envelope → wasted Anthropic spend on
+        // legacy WORKFLOW.md envelope → wasted Anthropic spend on
         // a tautological turn that produces nothing the cascade hasn't
         // already done.
         const stateLower = issue.state.toLowerCase();
@@ -679,10 +679,10 @@ export class Orchestrator {
           continue;
         }
 
-        // §8 / E-13 transition-only states: state HAS a state_transitions
+        // Transition-only states: state HAS a state_transitions
         // edge but NO LLM specialist (e.g. "Ready to deploy" auto-advances
         // to "PR validation"). Without this skip, the orchestrator falls
-        // through to the legacy WORKFLOW.staging.md envelope and dispatches
+        // through to the legacy WORKFLOW.md envelope and dispatches
         // a no-op LLM turn (~$1/turn), where the agent reads a "NO LLM CALL"
         // instruction in the Liquid template, posts a brief comment, and
         // exits. Fire the auto-advance directly here and skip dispatch
@@ -707,7 +707,7 @@ export class Orchestrator {
           continue;
         }
 
-        // Bug D fix: skip if the deliverable-gate previously escalated this
+        // Skip if the deliverable-gate previously escalated this
         // issue and the human hasn't moved it out of that state yet.
         // Case-insensitive comparison so subtle casing differences between
         // the dispatch path and the candidate-fetch path don't cause stale
@@ -763,7 +763,7 @@ export class Orchestrator {
   /* ------------------------- cascade triggers --------------- */
 
   /**
-   * §8 / E-9, E-13: walk the freshly-fetched candidate set, compare each
+   * Walk the freshly-fetched candidate set, compare each
    * issue's current state against `cascadeTriggerLastState`, and fire the
    * relevant cascade when a transition matches a trigger. The cascade
    * functions in `cascade.ts` are idempotent on the Linear side; gating
@@ -949,7 +949,7 @@ export class Orchestrator {
 
   /**
    * Pick the state to move a parked ticket back to. Today we always use
-   * the FIRST entry in `tracker.activeStates`, which for cerebro's
+   * the FIRST entry in `tracker.activeStates`, which for a typical
    * pipeline is `Refinement` — i.e. "start the issue over from the top".
    *
    * Rationale: by the time a ticket lands in `Error` we usually don't
@@ -987,7 +987,7 @@ export class Orchestrator {
     );
     if (!cap.allowed) {
       log.warn({ reason: cap.reason }, "dispatch rejected: cost cap exceeded");
-      // B-8: rate-limited Slack alert (per-reason 5-min dampening) so a
+      // rate-limited Slack alert (per-reason 5-min dampening) so a
       // burst of identical cap rejections collapses to one channel post.
       await this.deps.slack.announceRejection({
         kind: "cost_cap",
@@ -1076,7 +1076,7 @@ export class Orchestrator {
       await this.deps.slack.announceDispatch(issue, attempt);
       // Orchestrator-driven Linear comment so the board reflects what symphony
       // is doing, regardless of whether the agent itself reaches for the
-      // Linear MCP. Cerebro has the same pattern — write-side reliability
+      // Linear MCP. Write-side reliability
       // is the orchestrator's job, not the agent's. Best-effort, never
       // throws into the dispatch path.
       if (this.currentConfig.tracker.announceDispatch) {
@@ -1168,7 +1168,7 @@ export class Orchestrator {
     let totalCost = 0;
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
-    // B-3 / D-21 (AGENT-529): per-run prompt-cache accumulators. Both start
+    // per-run prompt-cache accumulators. Both start
     // at 0 and grow as runTurn results accumulate. Forwarded to the audit
     // row + Slack succeeded card; cache hit-rate computed at outcome time.
     let totalCacheCreationInputTokens = 0;
@@ -1189,18 +1189,18 @@ export class Orchestrator {
       // free-form human Q/A) — lifecycle telemetry is dropped. By
       // Implement-stage on a busy ticket the unfiltered prompt grew
       // ~quadratically in tokens; observed ~$0.30/turn just on
-      // comment-history input on AGENT-447. See
+      // comment-history input on . See
       // `selectSubstantiveComments` in tracker/linear.ts for the
       // canonical filter rules.
       const priorComments = await this.deps.tracker
         .fetchSubstantiveComments(issue.id)
         .catch(() => [] as Array<{ createdAt: string; body: string; author: string }>);
 
-      // First turn: try the 16-state specialist registry first (§8 / E-10..
-      // E-15). When the issue's state is owned by a specialist (Prioritized,
+      // First turn: try the 16-state specialist registry first.
+      // When the issue's state is owned by a specialist (Prioritized,
       // Technical plan, PR validation, Release), we drive the LLM with the
       // specialist's SYSTEM_PROMPT + buildUserMessage(ctx) instead of the
-      // legacy WORKFLOW.staging.md envelope. When no specialist is
+      // legacy WORKFLOW.md envelope. When no specialist is
       // registered for the state, fall back to buildFullPrompt — adding
       // specialists is purely additive.
       const specialistPrompt = await buildSpecialistPrompt({
@@ -1215,7 +1215,7 @@ export class Orchestrator {
         // root the agent will actually `cd` into. Previously this was
         // hard-coded to "/tmp", which made the prompt instruct agents to
         // run `gh` from a directory the tool guard denied. Surfaced by
-        // Copilot review on PR #684.
+        // Copilot review.
         workspacePath,
       });
       const firstPrompt =
@@ -1226,7 +1226,7 @@ export class Orchestrator {
           attempt,
           comments: priorComments,
         }));
-      // A-29 / S-D24: read the issue's already-recorded cumulative cost so
+      // read the issue's already-recorded cumulative cost so
       // the adapter can mid-stream-abort if the per-issue cap would be
       // exceeded. Best-effort: a Postgres failure leaves the cap inactive
       // for this turn (still active at dispatch via checkCaps). The cap
@@ -1243,12 +1243,12 @@ export class Orchestrator {
         signal: workerAc.signal,
         perIssueCapUsd: this.currentConfig.guardrails.perIssueCapUsd,
         alreadyRecordedCostUsd: issueBudgetAtStart,
-        // B-6: per-state cap looked up by lowercased state name. Map is
+        // per-state cap looked up by lowercased state name. Map is
         // empty by default; only fires when WORKFLOW.md sets
         // `guardrails.per_state_cap_usd`.
         perStateCapUsd:
           this.currentConfig.guardrails.perStateCapUsd[issue.state.toLowerCase()] ?? 0,
-        // B-12: per-state write-scope discipline. Map is empty by default;
+        // per-state write-scope discipline. Map is empty by default;
         // only fires when WORKFLOW.md sets `agent.write_cwds_by_state`.
         // `undefined` ⇒ adapter falls back to the default workspace-wide
         // write rule. An explicit `[]` blocks all file writes.
@@ -1258,7 +1258,7 @@ export class Orchestrator {
       totalCost += firstResult.usageDelta.costUsd;
       totalInputTokens += firstResult.usageDelta.inputTokens;
       totalOutputTokens += firstResult.usageDelta.outputTokens;
-      // B-3 / D-21 (AGENT-529): accumulate prompt-cache token subsets so
+      // accumulate prompt-cache token subsets so
       // the audit row and Slack succeeded card can show hit-rate. See
       // RunTurnResult.usageDelta JSDoc for semantics.
       totalCacheCreationInputTokens += firstResult.usageDelta.cacheCreationInputTokens;
@@ -1274,8 +1274,8 @@ export class Orchestrator {
       // again. Without the in-loop advance, a stage's deliverable
       // completes on turn 1 but the worker keeps spinning the SDK until
       // `maxTurns` (20) — the agent posts "no-op convergence" comments
-      // and burns ~$0.5 each. Observed on AGENT-441 (16 wasted Refinement
-      // turns, $7 burned) and AGENT-444 (6 wasted turns).
+      // and burns ~$0.5 each. Observed on  (16 wasted Refinement
+      // turns, $7 burned) and  (6 wasted turns).
       //
       // We also break the continuation if the live state drifted from
       // the dispatch state (whether by us auto-advancing OR by the agent
@@ -1327,17 +1327,17 @@ export class Orchestrator {
           stallTimeoutMs: this.currentConfig.codex.stallTimeoutMs,
           signal: workerAc.signal,
           perIssueCapUsd: this.currentConfig.guardrails.perIssueCapUsd,
-          // A-29: cumulative budget = DB value at run start + cost
+          // cumulative budget = DB value at run start + cost
           // accumulated across this run's prior turns. The DB hasn't been
           // updated yet (recordCost runs in the finally block); we track
           // intra-run cost via `totalCost`.
           alreadyRecordedCostUsd: issueBudgetAtStart + totalCost,
-          // B-6: per-state cap based on the LIVE state — handles the case
+          // per-state cap based on the LIVE state — handles the case
           // where the agent or orchestrator advanced the state mid-run
           // and continuation turns are running under a different cap.
           perStateCapUsd:
             this.currentConfig.guardrails.perStateCapUsd[fresh.state.toLowerCase()] ?? 0,
-          // B-12: per-state write-scope based on LIVE state (mid-run state
+          // per-state write-scope based on LIVE state (mid-run state
           // advances re-pin the write allowlist for continuation turns).
           writeCwds: this.currentConfig.agent.writeCwdsByState[fresh.state.toLowerCase()],
         });
@@ -1413,13 +1413,13 @@ export class Orchestrator {
         totalTokens,
         costUsd: totalCost,
         error: lastError,
-        // B-2: capture prompt provenance. Until TL-2 (prompts-in-code)
+        // capture prompt provenance. Until per-stage prompt modules land
         // ships per-stage prompt modules, the build SHA is the closest
         // proxy — every WORKFLOW.md change is captured by a redeploy
         // and a new git SHA. Once prompt.ts modules exist, replace with
         // the per-stage content hash.
         promptVersion: readGitSha(),
-        // B-3 / D-21 (AGENT-529): persist cache-fee subsets so the
+        // persist cache-fee subsets so the
         // post-hoc cache hit-rate is queryable from `symphony.run_audit`.
         cacheCreationInputTokens: totalCacheCreationInputTokens,
         cacheReadInputTokens: totalCacheReadInputTokens,
@@ -1427,7 +1427,7 @@ export class Orchestrator {
         logger.warn({ err: (err as Error).message }, "writeRunAudit threw unexpectedly"),
       );
 
-      // §8 / E-6 — bump per-issue specialist counters for the 16-state
+      // Bump per-issue specialist counters for the 16-state
       // pipeline. When the dispatch was on a state owned by a specialist
       // (Prioritized, Technical plan, PR validation, Release), record the
       // run in symphony.issue_metadata so re-run paths can see the count
@@ -1466,7 +1466,7 @@ export class Orchestrator {
           tokens: totalTokens,
           costUsd: totalCost,
           error: lastError ?? undefined,
-          // B-3 / D-21 (AGENT-529): surface cache-fee subsets so the Slack
+          // surface cache-fee subsets so the Slack
           // succeeded card shows hit-rate alongside cost. The observer
           // computes the displayed percentage; we just hand off the raw
           // counters so the formatting logic lives in one place.
@@ -1515,7 +1515,7 @@ export class Orchestrator {
       // minutes; a human or another agent may have moved the ticket).
       // Without this re-check, our auto-advance can stomp a manual move
       // and send the issue to the wrong next state. Surfaced by
-      // CodeRabbit on PR #502.
+      // CodeRabbit review.
       if (outcomeLabel === "Succeeded") {
         const dispatchState = issue.state;
         let liveState = dispatchState;
@@ -1541,7 +1541,7 @@ export class Orchestrator {
             "live state diverged from dispatch state; skipping auto-advance to respect manual move",
           );
         } else {
-          // §8 / E-15, E-16 nextStateOverride wiring. After the agent's turn
+          // nextStateOverride wiring. After the agent's turn
           // we fetch the FRESH description and look for a Decision line in
           // its specialist-owned report section (parseDecisionOverride scans
           // `## PR validation report`, `## Release report`, `## Error`).
@@ -1578,7 +1578,7 @@ export class Orchestrator {
           // posted a comment + exited cleanly. Without this guard the
           // orchestrator default-advances Release → Done per
           // `state_transitions["Release"]`, marking the sub Done with the
-          // PR still open. Real symptom on STG-17 (2026-05-07 cutover).
+          // PR still open. Real symptom seen at the 2026-05-07 cutover.
           //
           // Fire when:
           //   - liveState === "Release", AND
@@ -1716,7 +1716,7 @@ export class Orchestrator {
         // sub-ticket as a child of this issue and post a summary comment
         // on the parent linking the children.
         //
-        // Decoupled from auto-advance success (A-20 / S-D16): we gate on
+        // Decoupled from auto-advance success: we gate on
         // `dispatchState` — the stage the worker was DISPATCHED on, not on
         // `liveState` (the current Linear state). This means sub-tickets
         // file even if:
@@ -1728,7 +1728,7 @@ export class Orchestrator {
         //     should be filed.
         // Best-effort: a failure here doesn't unwind anything else.
         //
-        // Motivating case: AGENT-444 ("letter assignee"), where the Plan
+        // Motivating case:  ("letter assignee"), where the Plan
         // agent correctly identified 5 sub-tickets but had no path to
         // file them; the parent was manually closed because it couldn't
         // proceed under the existing one-PR-per-ticket assumption.
@@ -1817,17 +1817,17 @@ export class Orchestrator {
     const filed: Filed[] = [];
     const failed: Array<{ title: string; error: string }> = [];
 
-    // A-19 / S-D15: resolve parent's label-name list into Linear label IDs
+    // resolve parent's label-name list into Linear label IDs
     // ONCE before the sub-ticket loop so each child inherits the same tags.
     // Failure-mode: tracker returns [] on Linear read outage; subs file
     // without labels rather than blocking the whole batch.
     const inheritedLabelIds = await this.deps.tracker.resolveLabelIds(parent.labels);
 
-    // Bug F follow-up: if the parent is a behavioural-probe ticket (body
+    // If the parent is a behavioural-probe ticket (body
     // has the no-pr-required marker, OR title starts with [TEST]/[PROBE]),
     // propagate the marker to every child so the deliverable_missing guard
     // exempts them too. Saves the operator from re-typing it on every
-    // probe sub-ticket and prevents the Bug F loop reappearing on tests.
+    // probe sub-ticket and prevents the deliverable-gate loop reappearing on tests.
     const noPrRequired = shouldInjectNoPrRequiredMarker(parent);
 
     for (const sub of subs) {
@@ -1849,7 +1849,7 @@ export class Orchestrator {
           // Inherit the parent's priority by default. Linear's enum is
           // 0..4 inclusive — `priority` is `number | null` on Issue.
           priority: typeof parent.priority === "number" ? parent.priority : null,
-          // A-19 / S-D15: inherit parent's labels (e.g. `area:billing`,
+          // inherit parent's labels (e.g. `area:billing`,
           // `kind:bug`) so children land on the same board filters as the
           // parent. Empty array when parent has no labels OR the labels
           // lookup failed — never blocks ticket creation.
@@ -2040,7 +2040,7 @@ export class Orchestrator {
       this.noDeliverableCount.delete(issue.id);
       return { allowed: true };
     }
-    // Bug F (AGENT-512): behavioural-probe opt-out. When the issue body has
+    // Behavioural-probe opt-out. When the issue body has
     // `<!-- symphony:no-pr-required -->`, skip the GitHub branch check
     // entirely so the gate doesn't loop the ticket through warn → escalate
     // → re-dispatch. The skip clears any stale miss-counter from a prior
@@ -2103,9 +2103,9 @@ export class Orchestrator {
             "deliverable-gate: transition to Error failed (state may not exist)",
           ),
         );
-      // Bug D fix: regardless of whether the transition above succeeded, mark
+      // Regardless of whether the transition above succeeded, mark
       // this issue as "do not re-dispatch until the human moves it". When the
-      // team has no `Error` state (Cerebro team currently — `error_states: []`)
+      // team has no `Error` state (a team may have none — `error_states: []`)
       // the transition fails silently and we need an explicit skip so the
       // poll loop doesn't re-dispatch every 30s. The skip clears in `tick()`
       // when the issue's Linear state changes from `dispatchState`.
@@ -2147,7 +2147,7 @@ export class Orchestrator {
     // guard, a draining worker enqueues a continuation, the timer fires
     // (synchronously inside `setTimeout`), `onRetryFire` runs, and we
     // dispatch fresh work AFTER `gracefulStop` has signalled the
-    // singleton to release the lock. Surfaced by CodeRabbit on PR #502.
+    // singleton to release the lock. Surfaced by CodeRabbit review.
     if (this.stopped) {
       this.state.claimed.delete(issueId);
       return;
@@ -2250,10 +2250,10 @@ export class Orchestrator {
       return;
     }
 
-    // Bug D fix v3: the skip-map check must ALSO gate the auto-retry path.
+    // The skip-map check must ALSO gate the auto-retry path.
     // Without this, every retry timer ignores the skip map and re-dispatches
     // the issue immediately after the deliverable-gate escalates and
-    // populates the map. T-004 v5 (AGENT-500) surfaced this:
+    // populates the map. A probe ticket surfaced this:
     //   17:24:23 — marked issue as skip-until-state-change (map populated)
     //   17:24:23 — retry scheduled  ← retry path queued before skip-map check
     //   17:24:24 — dispatching       ← retry fired, bypassing my tick() filter

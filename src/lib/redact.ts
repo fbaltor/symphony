@@ -81,10 +81,10 @@ export function redactSecrets(text: string): string {
  * Used by `LinearTrackerClient.runGraphqlForAgent` to scrub agent-side
  * GraphQL `variables` payloads (e.g. `commentCreate.input.body`,
  * `issueCreate.input.description`) at the outbound MCP boundary. Without
- * this, B-9's per-string redactor in `createComment` only covers
+ * this, the per-string redactor in `createComment` only covers
  * orchestrator-emitted posts; agent-side posts via the `linear_graphql`
- * MCP would forward the literal credential to Linear (Bug E surfaced on
- * AGENT-503 / T-017).
+ * MCP would forward the literal credential to Linear — a real agent-side
+ * leak surfaced this gap. See docs/adr/0016.
  *
  * Cycle-safe via a `WeakSet` guard. Non-cyclic inputs from JSON-deserialized
  * GraphQL variables won't trigger it; the guard exists to prevent stack

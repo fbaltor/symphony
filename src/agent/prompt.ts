@@ -10,10 +10,10 @@ import { logger } from "../observability/logger.js";
  * prompt from the WORKFLOW.md template. Continuation turns send only short
  * continuation guidance.
  *
- * §8 / E-10..E-15: when an issue is in a state owned by a specialist
+ * When an issue is in a state owned by a specialist
  * (Prioritized / Technical plan / PR validation / Release), the orchestrator
  * drives the LLM with the specialist's SYSTEM_PROMPT + buildUserMessage
- * instead of the WORKFLOW.staging.md template envelope. The
+ * instead of the WORKFLOW.md template envelope. The
  * `buildSpecialistPrompt` helper below performs the lookup and assembles the
  * final string; `runWorker` calls it first and falls back to
  * `buildFullPrompt` only when no specialist is registered for the issue's
@@ -89,7 +89,7 @@ export async function buildSpecialistPrompt(args: {
    * to attempt `cd /tmp` and run `gh` outside the repo, which the tool guard
    * denies.
    *
-   * Surfaced 2026-05-07 by Copilot review on PR #684.
+   * Surfaced by Copilot review (2026-05-07).
    */
   workspacePath: string;
 }): Promise<string | null> {

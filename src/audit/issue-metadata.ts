@@ -1,11 +1,11 @@
 /**
- * Issue-metadata accessor — Postgres-backed implementation of the §8 / E-6
+ * Issue-metadata accessor — Postgres-backed implementation of the per-issue
  * "custom fields" contract.
  *
  * Linear's GraphQL API doesn't expose user-defined per-issue custom fields
  * (verified via `__schema.mutationType.fields` introspection on 2026-05-06 —
  * only `customViewCreate` exists; per-issue fields are paid-tier + UI-only).
- * Decision D-1 in tasks/06-05-2026-new-workflow-implementation.md: back the
+ * Design decision: back the
  * 7 fields with a Postgres table `symphony.issue_metadata` (defined in
  * src/audit/schema.sql).
  *

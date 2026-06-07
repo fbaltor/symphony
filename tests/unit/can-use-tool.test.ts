@@ -50,14 +50,19 @@ describe("makeCanUseTool — write scope", () => {
     expect(r.behavior).toBe("allow");
   });
 
-  it("blocks writes to symphony self-path even inside workspace", async () => {
-    const { makeCanUseTool } = await import("../../src/agent/can-use-tool.js");
-    const can = makeCanUseTool(WS);
-    const r = await can("Edit", {
-      file_path: `${WS}/independent/symphony/src/orchestrator/orchestrator.ts`,
-    });
-    expect(r.behavior).toBe("deny");
-    expect(r.behavior === "deny" && r.message).toContain("Symphony's own source");
+  it("blocks writes to the configured self-path even inside workspace", async () => {
+    process.env.SYMPHONY_SELF_PATH_FRAGMENT = "/packages/symphony/";
+    try {
+      const { makeCanUseTool } = await import("../../src/agent/can-use-tool.js");
+      const can = makeCanUseTool(WS);
+      const r = await can("Edit", {
+        file_path: `${WS}/packages/symphony/src/orchestrator/orchestrator.ts`,
+      });
+      expect(r.behavior).toBe("deny");
+      expect(r.behavior === "deny" && r.message).toContain("Symphony's own source");
+    } finally {
+      delete process.env.SYMPHONY_SELF_PATH_FRAGMENT;
+    }
   });
 });
 

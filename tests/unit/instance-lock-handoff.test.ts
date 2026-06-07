@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { acquireInstanceLock } from "../../src/singleton/instance-lock.js";
 
 /**
- * AGENT-520 — cooperative singleton-lock handoff regression suite.
+ * PROJ-520 — cooperative singleton-lock handoff regression suite.
  *
  * Closes the deploy-deadlock pattern where Cloud Run won't SIGTERM the
  * old revision until the new one is healthy, but the new one can't be
@@ -45,7 +45,7 @@ function makeFakeClient(opts: { advisoryLockSucceeds?: boolean } = {}): FakePool
   };
 }
 
-describe("instance-lock cooperative handoff (AGENT-520)", () => {
+describe("instance-lock cooperative handoff (PROJ-520)", () => {
   beforeEach(() => {
     // Fake timers so the heartbeat interval doesn't keep the test event
     // loop hot after the assertions land.

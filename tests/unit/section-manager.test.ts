@@ -309,14 +309,14 @@ describe("section-manager", () => {
       expect(parseDecisionOverride(desc)).toBe("Pull request");
     });
 
-    // T-NEW-5 regression (2026-05-07): the live PR validation specialist
+    // Regression (2026-05-07): the live PR validation specialist
     // emitted ONLY the natural-language form (no "Bouncing to Pull request."
     // strict line) — `"Iteration: 1 of 5 — bouncing back to Pull request."`.
     // The original strict regex `\bBouncing to Pull request\.?/i` rejected
-    // this, the orchestrator missed the override, and STG-17 advanced to
+    // this, the orchestrator missed the override, and PROJ-17 advanced to
     // Release per the default state_transitions instead of bouncing. The
     // regex was loosened to `\bBounc(?:e|ing)\b[^\n]*?\bto\s+Pull request`.
-    it("returns 'Pull request' for the natural 'bouncing back to' phrasing alone (T-NEW-5 regression)", () => {
+    it("returns 'Pull request' for the natural 'bouncing back to' phrasing alone (2026-05-07 regression)", () => {
       const desc = [
         "## PR validation report",
         "",

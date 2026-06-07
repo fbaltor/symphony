@@ -13,18 +13,18 @@ import { sleep } from "../lib/time.js";
  *   2. A heartbeat row (`symphony.instance_lock`) that tracks the active
  *      instance ID + last-heartbeat-at. New instances wait up to ACQUIRE_WAIT_MS
  *      for the existing heartbeat to age past LEASE_MS before claiming.
- *   3. AGENT-520 — cooperative handoff via `symphony.instance_lock_handoff`:
+ *   3. Cooperative handoff via `symphony.instance_lock_handoff`:
  *      when a new instance can't claim the lock immediately (because the
  *      old revision is still healthy + heartbeating), it INSERTs a request
  *      row. The old revision's heartbeat tick polls this table; if it sees
  *      a request from a DIFFERENT instance_id that's recent (< 60s old),
  *      it fires `onHandoffRequested()` so main.ts can trigger the same
- *      shutdown path as SIGTERM. PR #647's early-release-on-shutdown then
+ *      shutdown path as SIGTERM. The early-release-on-shutdown then
  *      frees the advisory lock and the new revision proceeds.
  *
  *      Without this, Cloud Run won't SIGTERM the old revision until the
  *      new one is healthy, but the new one can't be healthy without the
- *      lock — classic deadlock. Pre-AGENT-520 mitigation: manual
+ *      lock — classic deadlock. The earlier mitigation: manual
  *      `pg_terminate_backend(pid)` on every deploy.
  */
 
@@ -35,7 +35,7 @@ const HEARTBEAT_INTERVAL_MS = 5_000;
 const LEASE_MS = 15_000;
 const ACQUIRE_WAIT_MS = 30_000;
 /**
- * AGENT-520: how recent a handoff request must be before the heartbeat
+ * how recent a handoff request must be before the heartbeat
  * tick honors it. Bounded to prevent stale rows from a dead revision
  * triggering the live one to step down. 60s is well above the 30s
  * Cloud Run revision-startup window plus DB roundtrip slack.
@@ -57,7 +57,7 @@ export interface InstanceLockHandle {
 
 export interface AcquireInstanceLockOpts {
   /**
-   * AGENT-520: invoked on the old (lock-holding) instance when the heartbeat
+   * invoked on the old (lock-holding) instance when the heartbeat
    * tick sees a fresh handoff request from a new instance. Should kick off
    * the same shutdown path as SIGTERM — typically `void shutdown("handoff")`
    * in main.ts. Idempotent in main.ts via the `shuttingDown` flag.
@@ -73,7 +73,7 @@ export async function acquireInstanceLock(
   const startedAt = Date.now();
 
   // Step 1: wait for the previous heartbeat to age past LEASE_MS, OR until
-  // ACQUIRE_WAIT_MS elapses. AGENT-520: on the first observed-fresh heartbeat,
+  // ACQUIRE_WAIT_MS elapses. : on the first observed-fresh heartbeat,
   // write a handoff request so the old instance steps down voluntarily —
   // otherwise we'd deadlock waiting for a SIGTERM Cloud Run won't send.
   let wroteHandoffRequest = false;
@@ -88,7 +88,7 @@ export async function acquireInstanceLock(
       LOG_EVENT_LOCK_HELD,
     );
     if (!wroteHandoffRequest) {
-      // AGENT-520: signal the old instance to step down. Idempotent
+      // signal the old instance to step down. Idempotent
       // upsert; multiple new instances racing would each overwrite their
       // peer's row with their own instance_id, but the recipient (old
       // instance) only cares that SOMEONE ELSE is asking.
@@ -123,7 +123,7 @@ export async function acquireInstanceLock(
   // underlying socket dies (e.g. cloud-sql-proxy sidecar SIGTERM during
   // a Cloud Run rollout). Without this listener Node treats it as
   // unhandled and crashes the process — which we observed on rev
-  // 00004-v4g during the AGENT-447 Plan turn drain. We log + swallow;
+  // 00004-v4g during the  Plan turn drain. We log + swallow;
   // gracefulStop will detect drain completion via the workerPromises
   // tracking and main.ts exits cleanly.
   client.on("error", (err) => {
@@ -203,7 +203,7 @@ export async function acquireInstanceLock(
     // session-scoped, so a heartbeat on a random pool connection would
     // silently lose the lock signal.
     //
-    // AGENT-520: each tick also polls `instance_lock_handoff` for a fresh
+    // each tick also polls `instance_lock_handoff` for a fresh
     // request from a DIFFERENT instance_id. If found, fire the
     // `onHandoffRequested` callback (typically wired to `shutdown` in
     // main.ts). The callback is fired only once per handle lifetime via
@@ -251,7 +251,7 @@ export async function acquireInstanceLock(
           .catch((err) =>
             // Non-fatal — handoff polling is an optimization. Without it
             // we still rely on Cloud Run's eventual SIGTERM (which is
-            // exactly the deadlock AGENT-520 fixes, but the existing
+            // exactly the deadlock  fixes, but the existing
             // 540s drain timeout means we recover within 5-10 min).
             logger.warn({ err: err.message }, "handoff poll failed"),
           );
@@ -280,7 +280,7 @@ export async function acquireInstanceLock(
 
   logger.info({ instanceId }, LOG_EVENT_LOCK_ACQUIRED);
 
-  // AGENT-520: clear our own handoff request row now that we have the
+  // clear our own handoff request row now that we have the
   // lock. Without this, the row would linger and the heartbeat-tick
   // poll on this NEW instance would see its own request as a "handoff
   // request from another instance" if it ever runs against itself

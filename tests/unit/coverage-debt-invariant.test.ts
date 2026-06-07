@@ -32,7 +32,7 @@ const CATALOG_ENTRY_RE = /^##\s+`([a-z0-9-]+)`\s*$/;
 
 /** Walk `src/` recursively, returning absolute paths to every `.ts` /
  *  `.tsx` file. Symphony has no test or generated TS in `src/` so we
- *  don't need exclude lists (unlike Cerebro). */
+ *  don't need exclude lists. */
 function listSourceFiles(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {

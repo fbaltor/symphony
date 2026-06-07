@@ -44,7 +44,7 @@ const trackerCommonShape = {
      * configured `state_transitions[prev] === next` advancement and that
      * touch a review gate. This closes the gap where an in-flight agent
      * occasionally calls `update_issue` to bypass a human-review halt
-     * (e.g. AGENT-447 jumped Plan → Implement, skipping the RFC gate).
+     * (e.g.  jumped Plan → Implement, skipping the RFC gate).
      *
      * Compared case-insensitively. Defaults match the WORKFLOW.md gates:
      * RFC, Code Review, Human Review.
@@ -83,7 +83,7 @@ const trackerCommonShape = {
      * matching the issue identifier and BLOCKS the advance when no
      * deliverable is found.
      *
-     * Background: AGENT-441 + AGENT-439 (2026-04-29) reached `Code Review`
+     * Background:  +  (2026-04-29) reached `Code Review`
      * with empty branch state because their Validate-stage agents
      * converged on a no-op pattern, the SDK reported `outcome=Succeeded`,
      * and the orchestrator auto-advanced. The `pr_required_states` gate
@@ -216,7 +216,7 @@ const agentSchema = z.object({
   maxRetryBackoffMs: z.number().int().positive().default(300_000),
   maxConcurrentAgentsByState: z.record(z.string(), z.number().int().positive()).default({}),
   /**
-   * B-12 / Cerebro-pattern (C-6): per-state write-scope discipline. Maps a
+   * Per-state write-scope discipline (see docs/adr/0017). Maps a
    * Linear state name (case-insensitive at use time) to a list of workspace
    * subpaths the agent is permitted to write within while in that state.
    *
@@ -252,7 +252,7 @@ const guardrailsSchema = z
     dailyCapUsd: z.number().nonnegative().default(250),
     perIssueCapUsd: z.number().nonnegative().default(10),
     /**
-     * B-6 / Cerebro-pattern: per-state turn cost cap. Lookup keyed by
+     * Per-state turn cost cap (see docs/adr/0012). Lookup keyed by
      * Linear state name (case-insensitive at use time). Each ENTRY is
      * the max USD a SINGLE turn in that state may spend. Independent of
      * `perIssueCapUsd` (issue-wide cumulative) and `dailyCapUsd` (org-wide
@@ -267,7 +267,7 @@ const guardrailsSchema = z
      *       Plan: 5
      *       Implement: 25
      *
-     * A turn that exceeds its state cap aborts mid-stream (per A-29's
+     * A turn that exceeds its state cap aborts mid-stream (the
      * streaming abort). Empty / unset disables the per-state check.
      */
     perStateCapUsd: z.record(z.string(), z.number().nonnegative()).default({}),
@@ -284,11 +284,11 @@ const slackSchema = z
 // Two runtimes ship: the real `claude` adapter (default) and the scripted
 // `fake` runner (zero-LLM-cost, deterministic — used by the `kind: memory`
 // E2E profile; see runner-factory.ts + plan §3 "Agent axis stays
-// independent"). The Codex adapter (spec §10) is still a follow-up PR — see
-// IMPROVEMENTS.md S-D8 / A-6; when it lands, add it to this enum and
+// independent"). The Codex adapter (spec §10) is still a follow-up PR;
+// when it lands, add it to this enum and
 // reintroduce a runtime switch in the orchestrator.
 //
-// A-10: `model` is now non-empty-string-validated (was `optional` only —
+// `model` is now non-empty-string-validated (was `optional` only —
 // allowed misconfigured `model: ""` to slip through and fall back to SDK
 // default silently). `effort` is forwarded to Anthropic's adaptive
 // thinking config (`thinking: { type: "adaptive", effort }`) per the
@@ -418,7 +418,7 @@ export function resolveConfig(raw: RawWorkflow, ctx: ResolveContext): SymphonyCo
           | Record<string, unknown>
           | undefined,
       ),
-      // B-12: per-state write-scope discipline.
+      // per-state write-scope discipline.
       writeCwdsByState: lowercaseStateArrayMap(
         (agent.write_cwds_by_state ?? agent.writeCwdsByState) as
           | Record<string, unknown>
@@ -437,7 +437,7 @@ export function resolveConfig(raw: RawWorkflow, ctx: ResolveContext): SymphonyCo
     guardrails: {
       dailyCapUsd: guardrails.daily_cap_usd ?? guardrails.dailyCapUsd,
       perIssueCapUsd: guardrails.per_issue_cap_usd ?? guardrails.perIssueCapUsd,
-      // B-6: normalize keys to lowercase at parse time so case-insensitive
+      // normalize keys to lowercase at parse time so case-insensitive
       // lookup is a plain map.get() at use time.
       perStateCapUsd: lowercaseStateMap(
         (guardrails.per_state_cap_usd ?? guardrails.perStateCapUsd) as
@@ -559,7 +559,7 @@ function normalizeStateMap(input: Record<string, unknown> | undefined): Record<s
 }
 
 /**
- * B-6: same shape as normalizeStateMap but accepts non-integer values
+ * same shape as normalizeStateMap but accepts non-integer values
  * (USD cost caps are decimals). Lowercases keys for case-insensitive
  * lookup at use time.
  */
@@ -576,7 +576,7 @@ function lowercaseStateMap(input: Record<string, unknown> | undefined): Record<s
 }
 
 /**
- * B-12: state → list-of-subpath map (write-scope discipline). Lowercases
+ * state → list-of-subpath map (write-scope discipline). Lowercases
  * keys for case-insensitive lookup. Empty list `[]` is preserved (it
  * means "no writes allowed in this state"); a non-array value is
  * dropped silently rather than causing a crash on malformed YAML.
@@ -611,7 +611,7 @@ export function preflightValidate(cfg: SymphonyConfig): string | null {
       return "tracker.project_slug or tracker.team_id required when kind=linear";
     }
   }
-  // A-7: catch the literal `$SLACK_CHANNEL_ID` pass-through bug. When the env
+  // catch the literal `$SLACK_CHANNEL_ID` pass-through bug. When the env
   // var is unset, `expandEnvAndHome()` leaves the placeholder unchanged and
   // `pickStringOrNull` accepts it — Slack would post to channel "$SLACK_CHANNEL_ID"
   // and 404. Validate here so a misconfigured deploy fails at boot rather

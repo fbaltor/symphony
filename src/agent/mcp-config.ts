@@ -27,7 +27,7 @@ export type ClaudeMcpServerConfig =
       headers?: Record<string, string>;
     }
   | {
-      // A-12 / S-D10: in-process MCP server. The Claude Agent SDK accepts a
+      // in-process MCP server. The Claude Agent SDK accepts a
       // server instance and dispatches tool calls without spawning a
       // subprocess — used by `linear_graphql` so the agent reuses Symphony's
       // tracker auth. Mirrors the same variant on `ClaudeMcpServerOption`
@@ -46,7 +46,7 @@ export interface BuildMcpServersOptions {
   /** When true, skip GH installation-token mint (tests). */
   skipGithub?: boolean;
   /**
-   * A-12: when set AND the tracker satisfies `isAgentToolProvider`, attaches
+   * when set AND the tracker satisfies `isAgentToolProvider`, attaches
    * the in-process `linear_graphql` MCP tool (spec §10.5). Reuses Symphony's
    * configured tracker auth so the agent never reads `LINEAR_API_KEY`
    * directly. Typed as the base `IssueTracker` (decision 1c) — a tracker with
@@ -73,7 +73,7 @@ export async function buildMcpServers(
   const env = opts.env ?? process.env;
   const out: ClaudeMcpServers = {};
 
-  // ─── Linear: in-process linear_graphql tool (A-12) ──────────────────
+  // ─── Linear: in-process linear_graphql tool ──────────────────
   // Built via tracker.runGraphqlForAgent — reuses Symphony's configured
   // auth. The first-party HTTP MCP (mcp.linear.app) below is still wired
   // for high-level Linear operations (issue creation, label CRUD, etc.);

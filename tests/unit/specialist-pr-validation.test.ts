@@ -83,13 +83,13 @@ describe("pr-validation specialist — prompt + module shape", () => {
     }): SpecialistContext {
       const issue: Issue = {
         id: "00000000-0000-0000-0000-000000000001",
-        identifier: overrides.identifier ?? "AGENT-999",
+        identifier: overrides.identifier ?? "PROJ-999",
         title: overrides.title ?? "Test ticket",
         description: overrides.description ?? null,
         priority: 2,
         state: "PR validation",
         branchName: null,
-        url: overrides.url ?? "https://linear.app/test/issue/AGENT-999",
+        url: overrides.url ?? "https://linear.app/test/issue/PROJ-999",
         labels: [],
         blockedBy: [],
         createdAt: null,
@@ -118,8 +118,8 @@ describe("pr-validation specialist — prompt + module shape", () => {
     }
 
     it("includes the issue identifier in the header", () => {
-      const msg = buildUserMessage(makeCtx({ identifier: "AGENT-555" }));
-      expect(msg).toContain("AGENT-555");
+      const msg = buildUserMessage(makeCtx({ identifier: "PROJ-555" }));
+      expect(msg).toContain("PROJ-555");
     });
 
     it("echoes Scope and Exit criteria sections when present", () => {

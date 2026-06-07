@@ -1,7 +1,7 @@
 /**
  * Section manager — idempotent edit helper for Linear-issue descriptions.
  *
- * §8 / E-19 of IMPROVEMENTS.md introduces the new 16-state pipeline. Every
+ * The 16-state pipeline (docs/adr/0010) drives this. Every
  * specialist agent (Prioritized, Technical plan, PR validation, Release)
  * writes its output as a `## <Name>` block in the issue's description. The
  * key requirement is **idempotency**: when a specialist re-runs (e.g., a
@@ -262,7 +262,7 @@ const DECISION_LINE_PATTERNS: Array<{ regex: RegExp; override: string | null }> 
   // somewhere on the same line.
   { regex: /\bAdvanc(?:e|ing)\b[^\n]*?\bto\s+Release\b/i, override: null },
   { regex: /\bAdvanc(?:e|ing)\b[^\n]*?\bto\s+Done\b/i, override: null },
-  // Bounce path. T-NEW-5 surfaced an LLM-phrasing miss: the specialist
+  // Bounce path. An LLM-phrasing miss surfaced here: the specialist
   // wrote "bouncing back to Pull request" instead of the spec's terser
   // "Bouncing to Pull request". The "back" word broke a stricter regex.
   // Tolerate any "Bounc(e|ing)" verb followed by "to Pull request" with

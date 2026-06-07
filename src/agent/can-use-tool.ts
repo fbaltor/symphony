@@ -2,7 +2,7 @@ import { resolve, sep } from "node:path";
 import { logger } from "../observability/logger.js";
 
 /**
- * `canUseTool` defense-in-depth for the Claude Agent SDK (A-24 / S-D19).
+ * `canUseTool` defense-in-depth for the Claude Agent SDK.
  *
  * Symphony runs with `permissionMode: "bypassPermissions"` because there's
  * no human in the loop to answer interactive prompts. That removes the
@@ -73,14 +73,17 @@ export function checkBashCommand(command: string): BashCheckResult {
 }
 
 /**
- * Path fragment that, if present inside a workspace path, signals the agent
- * is about to edit Symphony's own source. Writes to this fragment are denied
- * to prevent an in-flight agent from modifying the orchestrator while it runs.
- * Only relevant when Symphony's source is checked into the same repo being
- * orchestrated (monorepo layout). In standalone deployments this check is a
- * no-op because the workspace is the user's repo, not Symphony's.
+ * Optional self-edit guard. When `SYMPHONY_SELF_PATH_FRAGMENT` is set, writes
+ * to any path containing that fragment are denied, preventing an in-flight
+ * agent from modifying the orchestrator's own source while it runs. Only
+ * relevant in a monorepo layout where Symphony's source lives inside the repo
+ * being orchestrated (e.g. set it to `/packages/symphony/`). Empty (the
+ * default) disables the check — correct for standalone deployments, where the
+ * workspace is the user's repo, not Symphony's.
  */
-const SYMPHONY_SELF_PATH_FRAGMENT = `${sep}independent${sep}symphony${sep}`;
+function selfPathFragment(): string {
+  return process.env.SYMPHONY_SELF_PATH_FRAGMENT ?? "";
+}
 
 /**
  * Build a `canUseTool` callback bound to a per-issue workspace path. Called
@@ -141,9 +144,10 @@ export function makeCanUseTool(workspacePath: string, writeCwds?: readonly strin
       // Scope-lock for Symphony itself. Even when the path is inside the
       // workspace, deny writes that land in Symphony's own source tree.
       // The agent shouldn't modify its own orchestrator while it's running.
-      if (target.includes(SYMPHONY_SELF_PATH_FRAGMENT)) {
+      const selfFragment = selfPathFragment();
+      if (selfFragment && target.includes(selfFragment)) {
         logger.warn(
-          { toolName, path, fragment: SYMPHONY_SELF_PATH_FRAGMENT },
+          { toolName, path, fragment: selfFragment },
           "canUseTool: blocked Symphony self-edit",
         );
         return {

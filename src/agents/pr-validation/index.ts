@@ -8,7 +8,7 @@
  *
  * **`run()` is intentionally STUBBED for now.** The real `gh`-CLI-driven
  * implementation lands in Phase 2.5 (orchestrator wiring per the
- * IMPROVEMENTS.md sequencing). What lives here today is the cap-gate logic
+ * pipeline sequencing). What lives here today is the cap-gate logic
  * + iteration-counter bump, which IS load-bearing — even on the stubbed
  * path the orchestrator must not bypass `PR_VALIDATION_ITERATION_CAP`.
  *

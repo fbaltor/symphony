@@ -62,7 +62,7 @@ export function normalizePrivateKey(raw: string): string {
 
 /**
  * Build an RS256 JWT for a GitHub App. Hand-rolled so we don't pull a JWT
- * library; algorithm and `iat` skew match cerebro's helper.
+ * library; algorithm and `iat` skew follow the standard GitHub App JWT recipe.
  */
 export function buildAppJwt(appId: string, privateKeyPem: string): string {
   const header = { alg: "RS256", typ: "JWT" };
@@ -105,7 +105,7 @@ interface InstallationTokenResponse {
  * Mint (or return cached) a GitHub App installation access token.
  * Returns null when GH App env vars are missing.
  *
- * A-27: retries 3 times on transient transport errors (network failure or
+ * retries 3 times on transient transport errors (network failure or
  * HTTP 5xx) with 100 → 500 → 2000 ms backoff + ±20% jitter. Without this,
  * a single GitHub API blip (`502 Bad Gateway`, `503 Service Unavailable`)
  * caused the whole turn's GitHub MCP wiring to skip + before_run hook to
@@ -181,7 +181,7 @@ async function tryMintInstallationToken(url: string, jwt: string): Promise<MintO
         Accept: "application/vnd.github+json",
         Authorization: `Bearer ${jwt}`,
         "X-GitHub-Api-Version": "2022-11-28",
-        // B-15: include version + sha so GitHub audit logs identify the
+        // include version + sha so GitHub audit logs identify the
         // exact running binary that minted this installation token.
         "User-Agent": buildIdentifier(),
       },

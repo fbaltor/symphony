@@ -1,5 +1,5 @@
 /**
- * Specialist registry — §8 / E-10..E-15 of IMPROVEMENTS.md.
+ * Specialist registry for the 16-state pipeline (see docs/adr/0010).
  *
  * Aggregates the four specialist modules and exposes a state→specialist
  * lookup. Lookup is case-insensitive on state name because Linear's API
@@ -10,7 +10,7 @@
  * The orchestrator uses `findSpecialist(issue.state)` at the very start of
  * `runWorker` to decide whether to drive the LLM with a specialist's
  * SYSTEM_PROMPT + buildUserMessage, or to fall back to the legacy
- * WORKFLOW.staging.md template (`buildFullPrompt`). When the lookup
+ * WORKFLOW.md template (`buildFullPrompt`). When the lookup
  * returns null, dispatch proceeds via the legacy template — so adding a
  * specialist is purely additive: existing states keep working, the new
  * state gets its dedicated agent.

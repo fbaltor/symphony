@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { preflightValidate, type SymphonyConfig } from "../../src/workflow/config.js";
 
 /**
- * Spec §6.3 + IMPROVEMENTS.md A-7 — preflight catches unresolved env tokens
+ * Spec §6.3 — preflight catches unresolved env tokens
  * (`$VAR` literals that survived `expandEnvAndHome` because the env was unset)
  * and returns a structured error instead of letting the orchestrator post
  * to a literal `$VAR` Slack channel / Linear endpoint.

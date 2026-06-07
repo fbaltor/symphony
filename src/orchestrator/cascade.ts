@@ -1,19 +1,19 @@
 /**
- * Cascade dispatch — §8 / E-9, E-13, E-16 of IMPROVEMENTS.md.
+ * Cascade dispatch for the 16-state pipeline (docs/adr/0010).
  *
  * Three cascade flows fire as side effects of state changes (none of them
  * call an LLM):
  *
- *   1. **Development cascade** (E-9, E-13): when a parent ticket enters
+ *   1. **Development cascade**: when a parent ticket enters
  *      `Development`, transition every sub in `Subtask drafted` →
  *      `To implement (manual)` and post a parent comment listing them.
  *
- *   2. **Cancel cascade** (E-9): when a parent ticket enters `Canceled`,
+ *   2. **Cancel cascade**: when a parent ticket enters `Canceled`,
  *      transition every non-terminal sub → `Canceled` and post a parent
  *      comment listing them. Subs already in terminal states (Done,
  *      Canceled, Duplicate) are NOT touched.
  *
- *   3. **Sub-Done watcher** (E-16): when ANY sub reaches `Done`, query its
+ *   3. **Sub-Done watcher**: when ANY sub reaches `Done`, query its
  *      siblings; if all siblings are in terminal states (Done, Canceled,
  *      Duplicate), transition the parent → `Validation (manual)` and post
  *      a parent comment.
@@ -35,7 +35,7 @@ import { ensureIssueMetadataRow } from "../audit/issue-metadata.js";
  * the Sub-Done watcher.
  *
  * Hard-coded because they're Linear platform-level (not per-team config).
- * The team-level config in WORKFLOW.staging.md's `terminal_states` is for
+ * The team-level config in WORKFLOW.md's `terminal_states` is for
  * Symphony's poll-loop short-circuit; this list is Linear's actual
  * terminal-type semantics.
  */
@@ -86,7 +86,7 @@ export interface CascadeResult {
 }
 
 /**
- * Development cascade (E-9 / E-13): parent → Development triggers each sub
+ * Development cascade: parent → Development triggers each sub
  * in `Subtask drafted` → `To implement (manual)`.
  *
  * Idempotent: subs already past Subtask drafted (e.g., a sub already in
@@ -105,7 +105,7 @@ export async function runDevelopmentCascade(
 
   // Distinguish "fetch errored" (Linear/API outage — caller can retry on
   // next webhook tick) from "fetch returned an empty list" (Technical plan
-  // misbehaved). Surfaced 2026-05-07 by Copilot review on PR #684: emitting
+  // misbehaved). Surfaced by Copilot review (2026-05-07): emitting
   // the "no sub-issues" warning during a Linear outage produces noisy /
   // misleading operator signals.
   let fetchFailed = false;
@@ -193,7 +193,7 @@ export async function runDevelopmentCascade(
 }
 
 /**
- * Cancel cascade (E-9): parent → Canceled triggers each non-terminal sub
+ * Cancel cascade: parent → Canceled triggers each non-terminal sub
  * → Canceled.
  *
  * Idempotent: subs already in terminal states are skipped without error.
@@ -292,7 +292,7 @@ export interface SubDoneWatcherResult {
 }
 
 /**
- * Sub-Done watcher (E-16): when any sub reaches Done, the orchestrator
+ * Sub-Done watcher: when any sub reaches Done, the orchestrator
  * calls this with the SUB's parent. The watcher queries all siblings:
  *   - If all siblings are in `SUB_COMPLETED_STATES` → transition parent
  *     → `Validation (manual)`, post a comment.
@@ -323,7 +323,7 @@ export async function runSubDoneWatcher(
   // fetch failure must NOT be reported as "parent has no sub-issues",
   // which would mislead the operator and could even trigger spurious
   // parent transitions if the upstream relied on `completedSiblings ===
-  // totalSiblings`. Surfaced 2026-05-07 by Copilot review on PR #684.
+  // totalSiblings`. Surfaced by Copilot review (2026-05-07).
   let fetchFailed = false;
   const children = await ctx.tracker.fetchChildIssues(parent.id).catch((err) => {
     fetchFailed = true;

@@ -13,7 +13,7 @@ import { nowMonotonicMs } from "../lib/time.js";
  *   C. Review-gate enforcement: revert unauthorized state moves to/from
  *      configured human-review states (RFC, Code Review, Human Review).
  *      Closes the gap where an in-flight agent calls `update_issue` to
- *      bypass a review halt — observed on AGENT-447 (Plan → Implement,
+ *      bypass a review halt — observed on  (Plan → Implement,
  *      skipping the RFC gate).
  */
 
@@ -135,7 +135,7 @@ export async function reconcileTrackerStates(args: {
   stateTransitions?: Record<string, string>;
   lastSeenState?: Map<string, string>;
   /**
-   * A-18: per-issue revert-timestamp tracker. After REVERT_RATE_LIMIT
+   * per-issue revert-timestamp tracker. After REVERT_RATE_LIMIT
    * reverts inside REVERT_WINDOW_MS, the reconciler stops reverting and
    * moves the issue to `errorStates[0]` instead — escapes the busy-loop
    * where a persistent agent fights the gate-revert on every tick.
@@ -144,7 +144,7 @@ export async function reconcileTrackerStates(args: {
    */
   recentRevertTimestampsMs?: Map<string, number[]>;
   /**
-   * A-18: list of error sink states (typically `tracker.errorStates`).
+   * list of error sink states (typically `tracker.errorStates`).
    * The reconciler uses `errorStates[0]` as the escalation target when
    * a per-issue revert burst exceeds the rate limit. Empty / undefined
    * disables the escalation (status-quo behavior — log + keep reverting).
@@ -180,7 +180,7 @@ export async function reconcileTrackerStates(args: {
    */
   isProtectedTerminalIssue?: (issueId: string) => boolean | Promise<boolean>;
   /**
-   * A-16 / S-D13 (Task 2): the bot's own Linear user id (from
+   * The bot's own Linear user id (from
    * `tracker.getViewerId()` at boot). When provided alongside `pool`,
    * the reconciler queries `symphony.issue_state_actor` for the issue
    * BEFORE reverting an unauthorized state move; if the last actor is
@@ -192,7 +192,7 @@ export async function reconcileTrackerStates(args: {
    */
   botUserId?: string | null;
   /**
-   * A-16 / S-D13: Postgres pool for reading `symphony.issue_state_actor`.
+   * Postgres pool for reading `symphony.issue_state_actor`.
    * Required when `botUserId` is set; otherwise ignored. Pass undefined
    * for tests that don't exercise the actor-skip path.
    */
@@ -254,12 +254,12 @@ export async function reconcileTrackerStates(args: {
           //     authorized edge (rare, mostly defensive).
           //   - the configured forward edge for prev points AT a review
           //     gate, and the agent moved elsewhere — i.e. they skipped
-          //     the gate. This is the AGENT-447 case: state_transitions[Plan]
+          //     the gate. This is the  case: state_transitions[Plan]
           //     = RFC, agent moved Plan → Implement, RFC was bypassed.
           const touchesGate = isInList(prev, reviewGates) || isInList(next, reviewGates);
           const configuredNext = lookupNext(prev, transitions);
           const skippedConfiguredGate = !!configuredNext && isInList(configuredNext, reviewGates);
-          // A-16 / S-D13 (Task 2): if we know the bot's user id and have
+          // If we know the bot's user id and have
           // a recorded actor for this issue, check whether the move was
           // human-driven. If yes, skip the revert path entirely — the
           // human is overriding the agent and that intent is load-bearing
@@ -281,7 +281,7 @@ export async function reconcileTrackerStates(args: {
                   [fresh.id],
                 );
                 const row = r.rows[0];
-                // Stale-row guard (Copilot review on PR #691): trust the
+                // Stale-row guard (Copilot review): trust the
                 // recorded actor ONLY when its `last_state` matches the
                 // state the orchestrator just observed (`next`). If they
                 // differ — the webhook missed a delivery, events arrived
@@ -335,7 +335,7 @@ export async function reconcileTrackerStates(args: {
               : isInList(prev, reviewGates)
                 ? prev
                 : (configuredNext as string);
-            // A-18: per-issue revert rate limit. Track recent revert
+            // per-issue revert rate limit. Track recent revert
             // timestamps; if too many in the window, escalate instead of
             // reverting again. Counter is in-memory; mirrors lastSeenState's
             // restart behavior (resets on rollover, which is acceptable —

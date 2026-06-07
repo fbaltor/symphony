@@ -2,7 +2,6 @@ import type { Issue } from "../types.js";
 import type { IssueTracker } from "./tracker.js";
 import { logger } from "../observability/logger.js";
 import {
-  CEREBRO_LIFECYCLE_MARKER_PREFIX,
   PR_OR_COMMIT_URL_RE,
   SUBSTANTIVE_HEADINGS,
   SYMPHONY_LIFECYCLE_MARKER_PREFIX,
@@ -29,7 +28,7 @@ export interface LinearClientOptions {
   /**
    * Linear filter scope. At least one of `projectSlug` or `teamId` MUST be
    * set. When `teamId` is present, the tracker filters by team membership
-   * (matching how Cerebro is organized as a Linear *team*, not a project);
+   * (matching a team-scoped Linear setup, not a project);
    * otherwise it falls back to project filter (the spec's default
    * `tracker.project_slug` semantics).
    */
@@ -166,7 +165,7 @@ const TEAM_STATES_QUERY = /* GraphQL */ `
   }
 `;
 
-// Lookup label ids for a team (used by sub-ticket filing — A-19 / S-D15 — to
+// Lookup label ids for a team (used by sub-ticket filing — to
 // translate `parent.labels` (lowercase names from the normalized Issue) into
 // Linear-required `labelIds` so children inherit the parent's tag taxonomy).
 // Same caching pattern as TEAM_STATES_QUERY; invalidated on WORKFLOW.md reload.
@@ -233,7 +232,7 @@ const ISSUE_CREATE_MUTATION = /* GraphQL */ `
   }
 `;
 
-// E-9 / E-13 / E-16: list a parent's sub-issues so cascade dispatch can
+// list a parent's sub-issues so cascade dispatch can
 // fan-out the Development → "To implement (manual)" transition, the
 // Cancel cascade, and the Sub-Done watcher.
 const FETCH_CHILDREN_QUERY = /* GraphQL */ `
@@ -255,7 +254,7 @@ const FETCH_CHILDREN_QUERY = /* GraphQL */ `
   }
 `;
 
-// E-12 re-plan path: archive a sub-issue when the human's revised plan no
+// Re-plan path: archive a sub-issue when the human's revised plan no
 // longer needs it. Soft-archive (Linear keeps the issue + its history for
 // reference; doesn't delete).
 const ISSUE_ARCHIVE_MUTATION = /* GraphQL */ `
@@ -266,7 +265,7 @@ const ISSUE_ARCHIVE_MUTATION = /* GraphQL */ `
   }
 `;
 
-// E-12 re-plan path: update an existing sub-issue's description in-place so
+// Re-plan path: update an existing sub-issue's description in-place so
 // the section-manager helper can re-run on its existing template without
 // duplicating sections.
 const ISSUE_UPDATE_DESCRIPTION_MUTATION = /* GraphQL */ `
@@ -296,11 +295,11 @@ export class LinearTrackerClient implements IssueTracker {
   private readonly pageSize: number;
   private readonly networkTimeoutMs: number;
   private teamStatesCache: Map<string, TeamState> | null = null;
-  // A-19 / S-D15: cached team labels map (lowercase name → id) for
+  // cached team labels map (lowercase name → id) for
   // sub-ticket filing. Invalidated alongside teamStatesCache on
-  // WORKFLOW.md reload (per A-13).
+  // WORKFLOW.md reload.
   private teamLabelsCache: Map<string, string> | null = null;
-  // A-15: rate-limited fetchIssueComments failure tracking. We swallow
+  // rate-limited fetchIssueComments failure tracking. We swallow
   // the error per-call so dispatch isn't blocked, but a sustained Linear
   // outage means agents run with no comment history and produce poor work.
   // Track recent failure timestamps; if >= 3 failures land in a 5-min
@@ -308,7 +307,7 @@ export class LinearTrackerClient implements IssueTracker {
   private commentFetchFailureTimestampsMs: number[] = [];
   private commentFetchLastWarnAtMs = 0;
   /**
-   * A-16 / S-D13 (Task 2): the bot's own Linear user ID, fetched once at
+   * The bot's own Linear user ID, fetched once at
    * boot via `viewer { id }`. The reconciler uses it to distinguish moves
    * the agent made (actor.id === viewerId) from moves a human made
    * (actor.id !== viewerId). Read-only after fetchViewerId() resolves;
@@ -335,7 +334,7 @@ export class LinearTrackerClient implements IssueTracker {
   }
 
   /**
-   * A-16 / S-D13 (Task 2): one-shot lookup of the bot's own Linear user
+   * One-shot lookup of the bot's own Linear user
    * ID. Called from `main.ts` boot AFTER the tracker is constructed but
    * BEFORE the orchestrator polls — the reconciler reads `getViewerId()`
    * to decide whether a state move was bot-driven or human-driven.
@@ -347,7 +346,7 @@ export class LinearTrackerClient implements IssueTracker {
    * lifetime of the process even after Linear recovers, which is worse
    * than a stray retry per orchestrator tick (the boot caller is the
    * dominant call site; retry cost is negligible). Surfaced 2026-05-07
-   * by Copilot review on PR #691.
+   * by Copilot review.
    *
    * The query uses Linear's `viewer { id }` which returns the user
    * associated with the API key — for a personal API key that's the
@@ -396,7 +395,7 @@ export class LinearTrackerClient implements IssueTracker {
    * shouldn't block agent work.
    */
   async createComment(issueId: string, body: string): Promise<{ id: string; url: string } | null> {
-    // B-9 / Cerebro pattern: scrub known-shape secrets out of free-text
+    // Scrub known-shape secrets out of free-text
     // bodies before they hit Linear. An agent that surfaced an
     // ANTHROPIC_API_KEY in command output (`env | head`, etc.) would
     // otherwise post the literal key into a Linear comment indexed by
@@ -438,13 +437,13 @@ export class LinearTrackerClient implements IssueTracker {
     /**
      * Linear label IDs — pass to inherit parent's tag taxonomy on sub-tickets.
      * Use `resolveLabelIds(parent.labels)` to translate normalized lowercase
-     * names into IDs (A-19).
+     * names into IDs.
      */
     labelIds?: readonly string[];
   }): Promise<{ id: string; identifier: string; url: string }> {
     const input: Record<string, unknown> = {
       teamId: args.teamId,
-      // B-9: scrub secrets from agent-surfaced text before it lands in
+      // scrub secrets from agent-surfaced text before it lands in
       // Linear. createIssue is on the post-Plan sub-ticket fan-out hot
       // path; titles + descriptions are derived from the agent's RFC.
       title: redactSecrets(args.title),
@@ -474,7 +473,7 @@ export class LinearTrackerClient implements IssueTracker {
   }
 
   /**
-   * Fetch all sub-issues of a parent. Used by E-9 / E-13 / E-16 cascade
+   * Fetch all sub-issues of a parent. Used by cascade
    * dispatch:
    *   - Development cascade: query subs in `Subtask drafted`, transition
    *     each → `To implement (manual)`.
@@ -567,7 +566,7 @@ export class LinearTrackerClient implements IssueTracker {
 
   /**
    * Soft-archive an issue. Used by the Technical plan agent's re-plan path
-   * (E-12) when the human's revised request no longer needs a previously-
+   * when the human's revised request no longer needs a previously-
    * filed sub-issue. Archiving preserves the sub's history (so its `## Scope`
    * and any human comments stay readable) but removes it from the team's
    * default views.
@@ -590,7 +589,7 @@ export class LinearTrackerClient implements IssueTracker {
 
   /**
    * Update an issue's description in-place. Used by the Technical plan
-   * agent's re-plan path (E-12) to re-write existing sub-issue descriptions
+   * agent's re-plan path to re-write existing sub-issue descriptions
    * via the section-manager helper without duplicating sections.
    *
    * Wraps the new description with `redactSecrets` for the same reason
@@ -669,8 +668,8 @@ export class LinearTrackerClient implements IssueTracker {
    * each stage's agent only sees the issue title + body and re-derives
    * context from scratch every turn.
    *
-   * `first` is capped at 50 by Linear's API (and 50 is plenty: cerebro's
-   * busiest tickets have ~30 comments end-to-end). Returns the empty
+   * `first` is capped at 50 by Linear's API (and 50 is plenty: a busy
+   * team's tickets have ~30 comments end-to-end). Returns the empty
    * array on any failure so the prompt can render without history rather
    * than blocking dispatch on a Linear read outage.
    */
@@ -713,7 +712,7 @@ export class LinearTrackerClient implements IssueTracker {
   }
 
   /**
-   * A-15 — emit a rate-limited warn after >=3 fetchIssueComments failures
+   * emit a rate-limited warn after >=3 fetchIssueComments failures
    * inside a 5-minute rolling window, then again at-most every 5 minutes
    * while the burst persists. Operators get visibility on a sustained Linear
    * read outage without log spam from a single transient blip.
@@ -756,7 +755,7 @@ export class LinearTrackerClient implements IssueTracker {
    * ~100 comments over Refinement → Plan → Validate → Implement → Open PR
    * → Reviewed → Test → Deploy → Monitoring → Done. By Implement-stage
    * the prompt token cost grows ~quadratically per dispatch — observed on
-   * AGENT-447 at ~$0.30/turn just on comment-history input.
+   *  at ~$0.30/turn just on comment-history input.
    *
    * The vast majority of those comments are *lifecycle telemetry* the
    * orchestrator itself posts (turn-started/turn-finished, with cost +
@@ -785,13 +784,13 @@ export class LinearTrackerClient implements IssueTracker {
 
   /**
    * Invalidate the cached team-states map. Called by the orchestrator on
-   * WORKFLOW.md reload (per IMPROVEMENTS.md A-13 / S-D11) so a freshly-added
+   * WORKFLOW.md reload so a freshly-added
    * Linear workflow state is picked up without restarting the daemon.
    * Safe to call when no cache is populated.
    */
   invalidateTeamStatesCache(): void {
     this.teamStatesCache = null;
-    // A-19: invalidate label cache on the same hook so a freshly-added
+    // invalidate label cache on the same hook so a freshly-added
     // Linear label is picked up by the next sub-ticket file.
     this.teamLabelsCache = null;
   }
@@ -799,7 +798,7 @@ export class LinearTrackerClient implements IssueTracker {
   /**
    * Resolve `parent.labels` (lowercase name array from the normalized Issue)
    * into Linear `labelIds` so a sub-ticket inherits its parent's taxonomy
-   * (A-19 / S-D15). Names that don't exist on the team's label catalog are
+   *. Names that don't exist on the team's label catalog are
    * silently skipped — a typo or stale label shouldn't fail the whole
    * sub-ticket file.
    *
@@ -1000,7 +999,7 @@ export class LinearTrackerClient implements IssueTracker {
 
   /**
    * Public GraphQL caller — exposed for the in-process `linear_graphql` MCP
-   * tool (A-12 / S-D10). Spec §10.5 says agents that hold this tool MUST
+   * tool. Spec §10.5 says agents that hold this tool MUST
    * reuse the orchestrator's configured tracker auth rather than reading
    * raw tokens themselves; this method is the canonical surface.
    *
@@ -1011,20 +1010,20 @@ export class LinearTrackerClient implements IssueTracker {
    *   - top-level GraphQL `errors[]` returns success=false with the body
    *     preserved (TrackerError code `linear_graphql_errors`)
    *   - transport / 5xx errors get the same retry treatment as internal
-   *     callers (per A-14)
+   *     callers
    */
   async runGraphqlForAgent<T = unknown>(
     query: string,
     variables: Record<string, unknown> = {},
   ): Promise<T> {
-    // Bug E fix (B-9 coverage gap): scrub secret-shaped values from
+    // Coverage-gap fix: scrub secret-shaped values from
     // every string field in `variables` before forwarding to Linear's
     // GraphQL endpoint. The orchestrator's own posts go through
     // `LinearTrackerClient.createComment` which already wraps `body`
     // in `redactSecrets` — but agent-side posts via the in-process
     // `linear_graphql` MCP land here directly. Without this, a model
     // that surfaces a credential-shaped string in its output would
-    // post it literally to Linear (observed on AGENT-503 / T-017).
+    // post it literally to Linear (a real agent-side leak).
     //
     // Walks the variables object recursively so `commentCreate.input.body`,
     // `issueCreate.input.description`, multi-step batch payloads etc. all
@@ -1034,7 +1033,7 @@ export class LinearTrackerClient implements IssueTracker {
   }
 
   /**
-   * GraphQL caller with retry on transient transport errors (A-14 / S-D12).
+   * GraphQL caller with retry on transient transport errors.
    *
    * Retries 3 attempts with 100 → 500 → 2000 ms backoff (+ ±20% jitter) on:
    *   - `linear_api_request` — network errors / abort / timeout
@@ -1079,8 +1078,7 @@ export class LinearTrackerClient implements IssueTracker {
     let res: Response;
     try {
       // Linear personal API keys (lin_api_*) are passed bare; OAuth tokens /
-      // PATs require a `Bearer ` prefix. See Linear docs + cerebro setup
-      // script `setup-linear-schema.ts`.
+      // PATs require a `Bearer ` prefix. See Linear docs.
       const auth = this.apiKey.startsWith("lin_api_") ? this.apiKey : `Bearer ${this.apiKey}`;
       res = await this.fetchImpl(this.endpoint, {
         method: "POST",
@@ -1153,7 +1151,7 @@ export function isRetryableTrackerError(err: TrackerError): boolean {
 /**
  * Build the IssueFilter scope from the configured options. Team filter takes
  * precedence over project filter so an org can use Symphony against a
- * Linear *team* (the way Cerebro is set up) without having to invent a
+ * Linear *team* (a team-scoped setup) without having to invent a
  * dedicated Linear project for it.
  */
 function buildScope(opts: LinearClientOptions): Record<string, unknown> {
@@ -1192,8 +1190,8 @@ export interface SelectSubstantiveCommentsOptions {
   bodyMaxChars?: number;
 }
 
-// Lifecycle markers + heading constants moved to `src/lib/markers.ts` per
-// A-21 so they're shared with `orchestrator/reconcile.ts` etc.
+// Lifecycle markers + heading constants moved to `src/lib/markers.ts`
+// so they're shared with `orchestrator/reconcile.ts` etc.
 
 /**
  * Filter a chronologically-ordered comment list (oldest-first, as
@@ -1203,7 +1201,7 @@ export interface SelectSubstantiveCommentsOptions {
  * "Substantive" — comment body matches at least one of:
  *   - one of the SUBSTANTIVE_HEADINGS
  *   - a PR or commit URL
- *   - free-form human comment (no symphony/cerebro lifecycle markers,
+ *   - free-form human comment (no symphony lifecycle markers,
  *     not matching SYMPHONY_TURN_HEADING_RE)
  *
  * Body cap: each kept comment trimmed to `bodyMaxChars`, suffixed with
@@ -1228,7 +1226,6 @@ export function selectSubstantiveComments(
 function isSubstantiveBody(body: string): boolean {
   if (!body) return false;
   if (body.includes(SYMPHONY_LIFECYCLE_MARKER_PREFIX)) return false;
-  if (body.includes(CEREBRO_LIFECYCLE_MARKER_PREFIX)) return false;
   const firstLine = body.trimStart().split("\n", 1)[0] ?? "";
   if (SYMPHONY_TURN_HEADING_RE.test(firstLine)) return false;
   for (const h of SUBSTANTIVE_HEADINGS) {

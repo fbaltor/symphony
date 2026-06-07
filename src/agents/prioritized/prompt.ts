@@ -1,5 +1,5 @@
 /**
- * Prioritized specialist prompt — §8 / E-11 of IMPROVEMENTS.md.
+ * Prioritized specialist prompt for the 16-state pipeline (see docs/adr/0010).
  *
  * The Prioritized agent fires when a human moves a Linear ticket from
  * Backlog → Prioritized. Its job is to read the human's request, gather

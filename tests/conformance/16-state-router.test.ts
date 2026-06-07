@@ -1,5 +1,5 @@
 /**
- * §8 / E-10..E-15 conformance — 16-state specialist registry + prompt routing.
+ * 16-state specialist registry + prompt routing conformance.
  *
  * Asserts that:
  *   - `findSpecialist(stateName)` resolves the correct specialist module by
@@ -34,7 +34,7 @@ import type { MetadataStore } from "../../src/audit/store.js";
 function fakeIssue(state: string): Issue {
   return {
     id: "i1",
-    identifier: "STG-1",
+    identifier: "PROJ-1",
     title: "test issue",
     description: "## Goals\nA placeholder body for prompt assembly.",
     priority: null,
@@ -111,7 +111,7 @@ describe("§8 buildSpecialistPrompt — first-turn rendering", () => {
     // The user message is concatenated after the system prompt with a "---"
     // separator. Assert both halves landed.
     expect(prompt!).toContain("---");
-    expect(prompt!).toContain("STG-1");
+    expect(prompt!).toContain("PROJ-1");
   });
 
   it("returns null for Backlog (not dispatched)", async () => {

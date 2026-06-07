@@ -6,7 +6,7 @@ import {
   type StateCapabilityProfile,
 } from "../../src/agent/capability-matrix.js";
 
-describe("capability matrix — B-10 invariants", () => {
+describe("capability matrix invariants", () => {
   it("every profile passes assertProfileShape (full Rule-of-Two coverage)", () => {
     for (const profile of Object.values(STATE_CAPABILITY_PROFILES)) {
       expect(() => assertProfileShape(profile)).not.toThrow();

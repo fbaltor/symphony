@@ -10,7 +10,7 @@ if [[ -z "${DATABASE_URL}" ]]; then
 fi
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
-SCHEMA="${REPO_ROOT}/independent/symphony/src/audit/schema.sql"
+SCHEMA="${REPO_ROOT}/src/audit/schema.sql"
 
 if ! command -v psql >/dev/null 2>&1; then
   echo "[symphony/migrate] psql not found in PATH" >&2

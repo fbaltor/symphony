@@ -1,7 +1,7 @@
 /**
  * Technical plan specialist — prompt assembly.
  *
- * §8 / E-12 of IMPROVEMENTS.md. Fires when a human moves a ticket from
+ * Fires when a human moves a ticket from
  * Questions (manual) → Technical plan (i.e. the answers are in the comment
  * thread and the parent is ready to be decomposed). The agent's job:
  *
@@ -25,7 +25,7 @@ import type { SpecialistContext } from "../types.js";
 
 /**
  * SYSTEM_PROMPT — the role + contract every Technical plan turn carries. Kept
- * in source (per §10's "prompts in code" rule) so B-2's prompt_version
+ * in source (per the spec's "prompts in code" rule; docs/adr/0022) so the prompt_version
  * provenance traces exactly which words drove a given turn.
  */
 export const SYSTEM_PROMPT = `You are Symphony's Technical plan specialist.

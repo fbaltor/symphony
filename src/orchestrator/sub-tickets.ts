@@ -1,7 +1,7 @@
 /**
  * Sub-ticket parser for the Plan stage.
  *
- * Motivating case: AGENT-444 ("letter assignee"). The Plan-stage agent
+ * Motivating case ("letter assignee"): the Plan-stage agent
  * correctly identified that the RFC scope required 5 sub-tickets — but
  * symphony had no path to file them. The ticket was manually closed.
  *
@@ -166,7 +166,7 @@ export function parseSubTickets(rfcBody: string): ParsedSubTicket[] {
 }
 
 /**
- * Bug F follow-up — the marker that opts a ticket out of the
+ * The marker that opts a ticket out of the
  * deliverable_missing guard. Must match `NO_PR_REQUIRED_MARKER_RE` in
  * `orchestrator.ts` exactly so the gate's regex finds it.
  */
@@ -177,7 +177,7 @@ const NO_PR_REQUIRED_MARKER = "<!-- symphony:no-pr-required -->";
  * deliverable is a Linear comment, not a PR". When the parent matches,
  * we propagate the marker to children automatically — saves the
  * operator from re-typing it on every probe sub-ticket and prevents
- * the Bug F loop from reappearing on test-shaped sub-tickets.
+ * the deliverable-gate loop from reappearing on test-shaped sub-tickets.
  *
  * Two signals:
  *   1. Explicit: parent body already contains the marker.

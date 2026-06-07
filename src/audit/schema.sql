@@ -28,14 +28,14 @@ CREATE TABLE IF NOT EXISTS symphony.run_audit (
 CREATE INDEX IF NOT EXISTS run_audit_issue_idx ON symphony.run_audit (issue_id, started_at DESC);
 CREATE INDEX IF NOT EXISTS run_audit_started_idx ON symphony.run_audit (started_at DESC);
 
--- B-2: per-run prompt provenance. Records the build's gitSha for runs
--- before TL-2 (prompts-in-code) lands; once per-stage prompt.ts modules
+-- per-run prompt provenance. Records the build's gitSha for runs
+-- before per-stage prompt.ts modules land; once those modules
 -- exist, this becomes the per-prompt content hash so a regression to a
 -- specific stage's prompt file is post-hoc analyzable. Nullable so
 -- pre-migration rows survive.
 ALTER TABLE symphony.run_audit ADD COLUMN IF NOT EXISTS prompt_version TEXT;
 
--- B-3 / D-21 (AGENT-529): Anthropic prompt-cache token tracking. Both
+-- Anthropic prompt-cache token tracking. Both
 -- columns are subsets of what would have been input_tokens had caching
 -- been disabled — `cache_creation_input_tokens` is what Anthropic billed
 -- at the cache-write fee (1.25× standard for the 5-min ephemeral TTL),
@@ -50,7 +50,7 @@ ALTER TABLE symphony.run_audit ADD COLUMN IF NOT EXISTS prompt_version TEXT;
 ALTER TABLE symphony.run_audit ADD COLUMN IF NOT EXISTS cache_creation_input_tokens INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE symphony.run_audit ADD COLUMN IF NOT EXISTS cache_read_input_tokens INTEGER NOT NULL DEFAULT 0;
 
--- A-16 / S-D13 (Task 2): per-issue last-state-change actor. The webhook
+-- Per-issue last-state-change actor (see docs/adr/0020). The webhook
 -- receiver writes one row per issue on every Issue.update event with the
 -- actor id + type from Linear's payload. The reconciler reads it before
 -- reverting an unauthorized state move — if the last actor is NOT
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS symphony.instance_lock (
     CHECK (id = 1)
 );
 
--- B-13: kill-switch — single-row table that halts dispatch when
+-- kill-switch — single-row table that halts dispatch when
 -- engaged. Operators flip it via POST /admin/kill-switch
 -- (`op=engage|clear`). The orchestrator checks it on every poll tick
 -- before claiming candidates; in-flight workers are NOT aborted (they
@@ -120,7 +120,7 @@ INSERT INTO symphony.kill_switch (id, engaged) VALUES (1, false)
   ON CONFLICT (id) DO NOTHING;
 
 -- Per-issue last-seen Linear state for the reconciler's review-gate
--- enforcement. A-17 / S-D14: previously this map lived in-memory on the
+-- enforcement. Previously this map lived in-memory on the
 -- Orchestrator and reset on restart; the first reconciler tick after a
 -- Cloud Run rollover would have no `prev` to compare against, opening a
 -- ~30s window where an unauthorized agent state move went unreverted.
@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS symphony.review_gate_state (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Slack thread root per (issue, channel). A-30 / S-D22: previously the
+-- Slack thread root per (issue, channel). Previously the
 -- thread_ts map lived in-memory and reset on every Symphony restart, so
 -- the same Linear issue's lifecycle posts split across multiple Slack
 -- threads on revision rollover. Persisting the root ts here keeps the
@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS symphony.slack_thread (
 
 -- Task 2 (2026-05-06): in-flight run tracking for orphan reconciliation.
 --
--- AGENT-521 (2026-05-06) demonstrated a real cost-truth gap: 6 Implement
+--  (2026-05-06) demonstrated a real cost-truth gap: 6 Implement
 -- dispatches OOM-killed before any audit row could be written, leaving
 -- ~$5–$15 of real Anthropic spend invisible to `/cost` and the audit
 -- table. The cost-cap module's `budget_state` carried partial cost
@@ -177,12 +177,12 @@ CREATE INDEX IF NOT EXISTS running_runs_instance_idx
 CREATE INDEX IF NOT EXISTS running_runs_started_idx
   ON symphony.running_runs (started_at);
 
--- AGENT-520: cooperative singleton-lock handoff during Cloud Run rollouts.
+-- cooperative singleton-lock handoff during Cloud Run rollouts.
 --
 -- Cloud Run only sends SIGTERM to the old revision AFTER the new one
 -- passes its startup probe — but the new revision can't pass the probe
 -- because the old revision is still healthy and holding the
--- session-scoped pg_try_advisory_lock. Classic deadlock; pre-AGENT-520
+-- session-scoped pg_try_advisory_lock. Classic deadlock; pre-
 -- mitigated by manually `pg_terminate_backend`'ing the old revision's
 -- PG session via cloud-sql-proxy on every deploy.
 --
@@ -196,7 +196,7 @@ CREATE INDEX IF NOT EXISTS running_runs_started_idx
 --      whose `requesting_instance_id != self.instance_id` AND
 --      `requested_at` is recent (< 60s old), the old revision invokes
 --      its own `gracefulStop` — same path as if SIGTERM had fired.
---   4. PR #647's early-release-on-shutdown path then runs, freeing the
+--   4. The early-release-on-shutdown path then runs, freeing the
 --      advisory lock and the heartbeat row.
 --   5. New revision's wait loop breaks on stale heartbeat, claims the
 --      advisory lock, deletes the handoff row.
@@ -211,7 +211,7 @@ CREATE TABLE IF NOT EXISTS symphony.instance_lock_handoff (
     CHECK (id = 1)
 );
 
--- E-6 / Task 06-05-2026 (new 16-state workflow): per-issue metadata.
+-- Per-issue metadata for the 16-state workflow.
 --
 -- The §8 spec called for 7 Linear-native custom fields (symphony_validation_iteration,
 -- symphony_questions_answered, symphony_plan_iteration, symphony_pr_validation_iteration,
@@ -220,7 +220,7 @@ CREATE TABLE IF NOT EXISTS symphony.instance_lock_handoff (
 -- custom fields — `customFieldCreate` etc. don't exist in the schema (only `customViewCreate`
 -- for views). Linear's per-issue custom-field feature is paid + UI-configured only.
 --
--- Decision (D-1 in tasks/06-05-2026-new-workflow-implementation.md): back the 7 fields
+-- Design decision: back the 7 fields
 -- with this Postgres table instead. Each row is keyed on Linear's internal `issueId`
 -- UUID. The specialist agents echo iteration counts inline in their owned description
 -- blocks (e.g., `## PR validation report` opens with "Iteration: 3 of 5") to keep
@@ -251,7 +251,7 @@ CREATE INDEX IF NOT EXISTS issue_metadata_error_idx
   ON symphony.issue_metadata (error_state)
   WHERE error_state IS NOT NULL;
 
--- E-17 / E-18 (2026-05-06): Linear webhook dedup table.
+-- Linear webhook dedup table.
 --
 -- Symphony's `POST /webhook/linear` receiver inserts each Linear delivery's
 -- `webhookId` here under a unique constraint, then routes to the cascade

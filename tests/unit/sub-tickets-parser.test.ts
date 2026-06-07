@@ -6,7 +6,7 @@ import {
 } from "../../src/orchestrator/sub-tickets.js";
 
 describe("parseSubTickets", () => {
-  it("happy path — parses the canonical AGENT-444 5-sub-ticket layout", () => {
+  it("happy path — parses the canonical PROJ-444 5-sub-ticket layout", () => {
     const rfc = `## RFC
 
 Some plan body. Files. Tests. Etc.
@@ -150,11 +150,11 @@ These are the tickets. Read them carefully.
 describe("renderChildDescription", () => {
   it("includes scope and dependency block when both provided", () => {
     const body = renderChildDescription({
-      parentIdentifier: "AGENT-444",
+      parentIdentifier: "PROJ-444",
       scope: "add nullable letterAssignee column",
       depsOnTitle: "Schema for assignee column",
     });
-    expect(body).toContain("Sub-ticket of **AGENT-444**");
+    expect(body).toContain("Sub-ticket of **PROJ-444**");
     expect(body).toContain("## Scope");
     expect(body).toContain("add nullable letterAssignee column");
     expect(body).toContain("Depends on:** Schema for assignee column");
@@ -162,18 +162,18 @@ describe("renderChildDescription", () => {
 
   it("omits sections when their inputs are missing", () => {
     const body = renderChildDescription({
-      parentIdentifier: "AGENT-444",
+      parentIdentifier: "PROJ-444",
       scope: "",
       depsOnTitle: null,
     });
     expect(body).not.toContain("## Scope");
     expect(body).not.toContain("Depends on");
-    expect(body).toContain("AGENT-444");
+    expect(body).toContain("PROJ-444");
   });
 
   it("appends the no-pr-required marker when noPrRequired is true", () => {
     const body = renderChildDescription({
-      parentIdentifier: "AGENT-444",
+      parentIdentifier: "PROJ-444",
       scope: "redaction probe",
       depsOnTitle: null,
       noPrRequired: true,
@@ -185,12 +185,12 @@ describe("renderChildDescription", () => {
 
   it("does NOT append the marker when noPrRequired is false / undefined", () => {
     const noFlag = renderChildDescription({
-      parentIdentifier: "AGENT-444",
+      parentIdentifier: "PROJ-444",
       scope: "real change",
       depsOnTitle: null,
     });
     const explicitFalse = renderChildDescription({
-      parentIdentifier: "AGENT-444",
+      parentIdentifier: "PROJ-444",
       scope: "real change",
       depsOnTitle: null,
       noPrRequired: false,
@@ -201,10 +201,10 @@ describe("renderChildDescription", () => {
 });
 
 /**
- * Bug F follow-up — propagate `<!-- symphony:no-pr-required -->` from
+ * Propagate `<!-- symphony:no-pr-required -->` from
  * behavioural-probe parents to their sub-tickets so the deliverable_missing
- * guard exempts them too. Without this propagation, T-005-style multi-probe
- * test plans hit the Bug F loop on every child.
+ * guard exempts them too. Without this propagation, multi-probe
+ * test plans hit the deliverable-gate loop on every child.
  */
 describe("shouldInjectNoPrRequiredMarker", () => {
   it("propagates when parent body contains the marker", () => {
@@ -219,7 +219,7 @@ describe("shouldInjectNoPrRequiredMarker", () => {
   it("propagates when parent title starts with [TEST]", () => {
     expect(
       shouldInjectNoPrRequiredMarker({
-        title: "[TEST] T-005 — sub-ticket gating",
+        title: "[TEST] sub-ticket gating",
         description: null,
       }),
     ).toBe(true);

@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
  * Spec §9.4 hook execution contract — `bash -c <script>` with a timeout, in a
  * given cwd. Returns exit code, stdout, stderr.
  *
- * Switched from `bash -lc` to `bash -c` per IMPROVEMENTS.md A-26: the login-
+ * Switched from `bash -lc` to `bash -c`: the login-
  * shell flag (`-l`) sources `/etc/profile` + `~/.bash_profile` + `~/.bashrc`
  * before running the script, which leaks the host's PATH/PROMPT/locale into
  * hook execution. On Cloud Run's minimal image those files are typically empty

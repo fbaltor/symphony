@@ -6,15 +6,12 @@
  * substantive-comment filter (used to seed prompt context for the next
  * dispatch) can drop lifecycle telemetry. The constants and regexes below
  * were duplicated across `tracker/linear.ts` and `orchestrator/reconcile.ts`
- * + `orchestrator.ts` (per IMPROVEMENTS.md S-25 / A-21). Centralized here so
+ * + `orchestrator.ts`. Centralized here so
  * a future change to the marker format only touches one file.
  */
 
 /** Substring marker for any orchestrator-emitted comment. */
 export const SYMPHONY_LIFECYCLE_MARKER_PREFIX = "<!-- symphony:event=";
-
-/** Substring marker for any Cerebro-emitted comment (legacy interop). */
-export const CEREBRO_LIFECYCLE_MARKER_PREFIX = "<!-- cerebro:specialist=";
 
 /**
  * Regex that matches the heading line of a Symphony "turn started"/"turn
@@ -30,8 +27,7 @@ export const SYMPHONY_TURN_HEADING_RE = /^\s*\S*\s*Symphony\s*[—–-]\s*.+\btu
  * Description-section headings that mark a comment as substantive (i.e.
  * carries deliverables we want the next agent dispatch to read).
  *
- * Mirrored across cerebro-v2 and the new symphony schema (see
- * IMPROVEMENTS.md §8.2). Update when adding a new managed section.
+ * Update when adding a new managed section.
  */
 export const SUBSTANTIVE_HEADINGS: readonly string[] = [
   "## Requirements",

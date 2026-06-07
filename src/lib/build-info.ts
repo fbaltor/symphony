@@ -12,7 +12,7 @@ import pkg from "../../package.json" with { type: "json" };
  *  - Slack lifecycle cards (footer with `symphony/<version>+<sha>`).
  *  - GitHub User-Agent + Anthropic `CLAUDE_AGENT_SDK_CLIENT_APP` env (audit).
  *
- * SHA resolution priority (mirrors Cerebro):
+ * SHA resolution priority:
  *  1. `SYMPHONY_BUILD_SHA` env var — set at image-build / deploy time.
  *  2. `K_REVISION` env var — Cloud Run injects this (e.g. `symphony-orchestrator-00007-abc`).
  *  3. `git rev-parse --short HEAD` — only fires in local dev when a `.git/`

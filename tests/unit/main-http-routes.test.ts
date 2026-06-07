@@ -38,7 +38,7 @@ async function fetchJson(url: string): Promise<{ status: number; body: unknown }
 const fakeSnapshot: OrchestratorSnapshot = {
   running: [
     {
-      identifier: "AGENT-441",
+      identifier: "PROJ-441",
       state: "Plan",
       started_at: "2026-04-29T12:00:00.000Z",
       duration_seconds: 240,
@@ -116,7 +116,7 @@ describe("HTTP routes", () => {
     servers.push(server);
     const { status, body } = await fetchJson(`http://127.0.0.1:${server.port}/health`);
     expect(status).toBe(200);
-    // B-15: /health envelope now includes build provenance (version + gitSha).
+    // /health envelope now includes build provenance (version + gitSha).
     expect(body).toMatchObject({ status: "ok" });
   });
 
@@ -139,7 +139,7 @@ describe("HTTP routes", () => {
       instance_id: "symphony-orchestrator-00012-hwz-abc123",
       running: [
         {
-          identifier: "AGENT-441",
+          identifier: "PROJ-441",
           state: "Plan",
           duration_seconds: 240,
         },
@@ -164,14 +164,14 @@ describe("HTTP routes", () => {
       .mockResolvedValueOnce({
         rows: [
           {
-            identifier: "AGENT-447",
+            identifier: "PROJ-447",
             total_usd: 35,
             runs: 5,
             first_seen: new Date("2026-04-01T00:00:00Z"),
             last_seen: new Date("2026-04-29T00:00:00Z"),
           },
           {
-            identifier: "AGENT-446",
+            identifier: "PROJ-446",
             total_usd: 7.5,
             runs: 2,
             first_seen: new Date("2026-04-01T00:00:00Z"),
@@ -199,14 +199,14 @@ describe("HTTP routes", () => {
       today_usd: 12.34,
       month_usd: 87.65,
       by_issue: [
-        { identifier: "AGENT-447", total_usd: 35, runs: 5 },
-        { identifier: "AGENT-446", total_usd: 7.5, runs: 2 },
+        { identifier: "PROJ-447", total_usd: 35, runs: 5 },
+        { identifier: "PROJ-446", total_usd: 7.5, runs: 2 },
       ],
       caps: {
         daily_cap_usd: 250,
         per_issue_cap_usd: 30,
         daily_remaining_usd: 237.66,
-        any_capped_issues: ["AGENT-447"],
+        any_capped_issues: ["PROJ-447"],
       },
     });
   });

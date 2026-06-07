@@ -1,8 +1,7 @@
 /**
  * PR validation specialist — system prompt + per-turn user-message builder.
  *
- * Per IMPROVEMENTS.md §8 / E-14 and WORKFLOW.staging.md "PR validation stage":
- * the agent fires when a sub-issue enters the `PR validation` state (the
+ * The agent fires when a sub-issue enters the `PR validation` state (the
  * orchestrator auto-advances `Ready to deploy → PR validation`). Its job is
  * narrow:
  *
@@ -38,7 +37,7 @@ import { PR_VALIDATION_ITERATION_CAP } from "../../audit/issue-metadata.js";
  * Multi-paragraph SYSTEM_PROMPT. Sent verbatim to the SDK as the system role.
  *
  * Keep this string self-contained — specialists do NOT receive the rendered
- * WORKFLOW.staging.md envelope (that's fallback for unknown states). Anything
+ * WORKFLOW.md envelope (that's fallback for unknown states). Anything
  * the agent needs to know about its job, its tools, and its decision tree
  * must be here.
  */

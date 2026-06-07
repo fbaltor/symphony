@@ -45,7 +45,7 @@ const PARENT_DESCRIPTION = [
 function makeIssue(overrides: Partial<Issue> = {}): Issue {
   return {
     id: "issue-uuid-001",
-    identifier: "STG-7",
+    identifier: "PROJ-7",
     title: "Charge column on contract detail",
     description: PARENT_DESCRIPTION,
     priority: 2,
@@ -128,7 +128,7 @@ describe("technical-plan SYSTEM_PROMPT", () => {
 
   it("warns the agent NOT to use the parent's identifier in branch / PR title / Closes", () => {
     // Guards the 2026-05-07 cutover bug. The Technical plan agent had written
-    // `Closes STG-5` (parent) into a sub's PR template, which made Linear
+    // `Closes PROJ-5` (parent) into a sub's PR template, which made Linear
     // auto-move the wrong issue when the PR landed. The prompt must
     // explicitly surface the SUB-vs-parent distinction and the
     // SUB-LINEAR-ID convention for branch / title / Closes.
@@ -162,7 +162,7 @@ describe("technical-plan SYSTEM_PROMPT", () => {
 describe("technical-plan buildUserMessage", () => {
   it("includes the issue identifier and title in the header", () => {
     const msg = buildUserMessage(makeContext());
-    expect(msg).toContain("STG-7");
+    expect(msg).toContain("PROJ-7");
     expect(msg).toContain("Charge column on contract detail");
   });
 
@@ -203,12 +203,12 @@ describe("technical-plan buildUserMessage", () => {
       ...makeContext(),
       existingSubs: [
         {
-          identifier: "STG-8",
+          identifier: "PROJ-8",
           title: "Add Charge column UI",
           scope: "Render the column in the table; no analytics changes here.",
         },
         {
-          identifier: "STG-9",
+          identifier: "PROJ-9",
           title: "Filter analytics by deletedAt",
           scope: "Backend-only; ignore the dashboard widget.",
         },
@@ -216,8 +216,8 @@ describe("technical-plan buildUserMessage", () => {
     };
     const msg = buildUserMessage(ctx);
     expect(msg).toContain("re-plan path");
-    expect(msg).toContain("STG-8");
-    expect(msg).toContain("STG-9");
+    expect(msg).toContain("PROJ-8");
+    expect(msg).toContain("PROJ-9");
     expect(msg).toContain("Render the column in the table");
     expect(msg).toContain("Filter analytics by deletedAt");
   });

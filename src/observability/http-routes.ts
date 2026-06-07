@@ -24,18 +24,18 @@ export interface HttpRouteContext {
   pool: pg.Pool | null;
   config: SymphonyConfig | null;
   instanceId: string | null;
-  /** A-32: WorkflowWatcher exposed for `POST /admin/reload`. Optional so
+  /** WorkflowWatcher exposed for `POST /admin/reload`. Optional so
    * existing callers (tests) can construct contexts without it. */
   watcher?: Pick<WorkflowWatcher, "reloadNow"> | null;
-  /** A-32: token gating for /admin/* routes. Read from `SYMPHONY_ADMIN_TOKEN`
+  /** Token gating for /admin/* routes. Read from `SYMPHONY_ADMIN_TOKEN`
    * env var by main.ts; null/empty = admin routes return 503. */
   adminToken?: string | null;
-  /** E-17 / E-18: Linear tracker shared with the poll loop, used by the
+  /** Linear tracker shared with the poll loop, used by the
    * `/webhook/linear` receiver to drive cascades without re-establishing
    * an HTTP client. Optional so existing callers (tests for /health,
    * /status, /cost) don't need to wire it up. */
   tracker?: IssueTracker | null;
-  /** E-17 / E-18: Linear webhook HMAC secret. Read from `LINEAR_WEBHOOK_SECRET`
+  /** Linear webhook HMAC secret. Read from `LINEAR_WEBHOOK_SECRET`
    * env var by main.ts; null/empty = `/webhook/linear` returns 503
    * (`webhook_disabled`). The poll loop continues running as a fallback. */
   webhookSecret?: string | null;
@@ -47,7 +47,7 @@ export async function handleHttpRequest(
   ctx: HttpRouteContext,
   req?: IncomingMessage,
 ): Promise<void> {
-  // E-17 / E-18 — `POST /webhook/linear`. Routed BEFORE /health so a
+  // `POST /webhook/linear`. Routed BEFORE /health so a
   // misconfigured proxy that forwards Linear's POST body to /health doesn't
   // accidentally short-circuit on the `url === "/"` branch above.
   // Webhook receiver owns its own auth + size + dedup gates; main.ts threads
@@ -62,9 +62,8 @@ export async function handleHttpRequest(
   }
 
   if (url === "/health" || url === "/") {
-    // B-15: surface build provenance on /health so an on-call operator can
-    // confirm "the fix shipped" with a single curl. Field names mirror
-    // Cerebro's /health envelope.
+    // surface build provenance on /health so an on-call operator can
+    // confirm "the fix shipped" with a single curl. See docs/adr/0021.
     const build = { version: SYMPHONY_VERSION, gitSha: readGitSha() };
     if (ctx.bootstrapReady) {
       respondJson(res, 200, { status: "ok", ...build });
@@ -123,7 +122,7 @@ export async function handleHttpRequest(
     return;
   }
 
-  // B-13 — `GET|POST /admin/kill-switch`: flip the dispatch halt-switch.
+  // `GET|POST /admin/kill-switch`: flip the dispatch halt-switch.
   // Token-gated like /admin/reload. Query string `op=engage|clear|status`
   // (default: status). On engage, optional `reason=` + `by=` query params
   // are persisted to the audit row. In-flight workers DRAIN — kill-switch
@@ -201,7 +200,7 @@ export async function handleHttpRequest(
     return;
   }
 
-  // A-32 — `POST /admin/reload`: re-read WORKFLOW.md from disk on demand.
+  // `POST /admin/reload`: re-read WORKFLOW.md from disk on demand.
   // Token-gated; useful in production where `fs.watch` doesn't fire (the
   // file is baked into the Cloud Run image). Operator workflow:
   //

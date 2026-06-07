@@ -1,7 +1,7 @@
 /**
  * Technical plan specialist — module entry point.
  *
- * §8 / E-12. The orchestrator's specialist registry imports the default
+ * The orchestrator's specialist registry imports the default
  * export and dispatches it whenever an issue enters the Technical plan
  * Linear state.
  *

@@ -1,6 +1,6 @@
 /**
- * Linear webhook receiver — Phase 2.6 of the 16-state pipeline (E-17 / E-18 in
- * `independent/IMPROVEMENTS.md` §8).
+ * Linear webhook receiver — Phase 2.6 of the 16-state pipeline (see
+ * docs/adr/0015).
  *
  * Routes Linear's `Issue.update` and `Issue.create` deliveries into the same
  * cascade primitives the 30s poll loop already uses. The poll loop stays
@@ -34,9 +34,9 @@
  *     "createdAt": "2026-05-06T12:34:56Z",
  *     "data": {
  *       "id": "<uuid>",
- *       "identifier": "STG-101",
+ *       "identifier": "PROJ-101",
  *       "state": { "name": "Development" },
- *       "parent": { "id": "<uuid>", "identifier": "STG-100" } | null,
+ *       "parent": { "id": "<uuid>", "identifier": "PROJ-100" } | null,
  *       ...
  *     },
  *     "updatedFrom": {                    // present on update events; the
@@ -137,7 +137,7 @@ interface LinearWebhookPayload {
   webhookId?: string;
   webhookTimestamp?: number;
   /**
-   * A-16 / S-D13 (Task 2): the user/app that triggered this event.
+   * The user/app that triggered this event.
    * Linear includes this on every webhook delivery; it's load-bearing
    * for the reconciler's revert-vs-allow decision (humans dragging
    * tickets must NOT be reverted; the agent's own moves are the bug
@@ -453,7 +453,7 @@ export async function handleLinearWebhook(
     return;
   }
 
-  // A-16 / S-D13 (Task 2): persist the actor that drove this state
+  // Persist the actor that drove this state
   // change so the reconciler can distinguish bot vs human moves.
   // Best-effort — runs in parallel with the cascade dispatch below.
   // We persist on EVERY Issue.update with a state, even ones that don't
@@ -486,14 +486,14 @@ export async function handleLinearWebhook(
   // present the sub has no parent and no watcher should fire (orphan
   // sub — likely a top-level Linear issue that landed here by mistake).
   //
-  // 2026-05-07 hot-fix (AGENT-546 forensic): Linear's webhook payload
+  // 2026-05-07 hot-fix ( forensic): Linear's webhook payload
   // for state-only Issue.update events often OMITS the full `parent`
   // object — the change set is just `state`, so Linear sends the bare
   // minimum and supplies `parentId` as a flat string instead. Before
   // this fix the Sub-Done watcher only checked `data.parent?.id`, so
-  // when Liuri marked AGENT-547 as Done at 16:36:34Z, Symphony received
+  // when Liuri marked  as Done at 16:36:34Z, Symphony received
   // the webhook (delivery 59ebf002… recorded in symphony.webhook_dedup
-  // at 16:36:35) but the watcher never fired and AGENT-546 stayed
+  // at 16:36:35) but the watcher never fired and  stayed
   // stuck in `Development`. The `Issue.create` branch already had the
   // `data.parent?.id ?? data.parentId` fallback for the metadata-row
   // pre-warm; this commit mirrors it here.
@@ -695,7 +695,7 @@ async function tryRecordDelivery(
 }
 
 /**
- * A-16 / S-D13 (Task 2): persist the actor that drove this Issue.update
+ * Persist the actor that drove this Issue.update
  * event into `symphony.issue_state_actor`. The reconciler reads this row
  * before reverting an unauthorized state move; if `last_actor_id` is
  * NOT the bot's viewer id, the move was human-driven and the revert
@@ -754,7 +754,7 @@ async function recordIssueStateActor(
  * to keep the table from growing unbounded — at current volume the table
  * stays under ~1 MB but a long-running deployment without rotation would
  * eventually accumulate millions of rows. Surfaced 2026-05-07 by Copilot
- * review on PR #684 (the original schema TODO punted this to operator-managed
+ * review (the original schema TODO punted this to operator-managed
  * pg_cron, but in-process is simpler and survives a Postgres host swap).
  */
 const WEBHOOK_DEDUP_RETENTION_HOURS = 24;

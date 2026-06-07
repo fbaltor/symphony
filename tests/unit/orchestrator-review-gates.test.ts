@@ -5,7 +5,7 @@ import { nowMonotonicMs } from "../../src/lib/time.js";
 import type { Issue, OrchestratorState, RunningEntry } from "../../src/types.js";
 
 /**
- * Review-gate enforcement tests — close the AGENT-447 hole where an
+ * Review-gate enforcement tests — close the PROJ-447 hole where an
  * in-flight agent calls `update_issue` to bypass an RFC / Code Review /
  * Human Review halt. The reconciler reverts unauthorized moves to/from
  * any state in `human_review_states` unless the transition is a known
@@ -44,7 +44,7 @@ const TERMINAL_STATES = ["Done", "Canceled", "Duplicate", "Error"];
 function fakeIssue(state: string): Issue {
   return {
     id: "i1",
-    identifier: "AGENT-447",
+    identifier: "PROJ-447",
     title: "t",
     description: null,
     priority: null,
@@ -98,7 +98,7 @@ async function run(args: RunArgs) {
   const transitionIssueToState =
     vi.fn<(id: string, name: string) => Promise<{ identifier: string; state: string }>>();
   transitionIssueToState.mockImplementation(async (_id, name) => ({
-    identifier: "AGENT-447",
+    identifier: "PROJ-447",
     state: name,
   }));
   const createComment =
@@ -284,7 +284,7 @@ describe("orchestrator review-gate enforcement", () => {
   it("revert-comment failure does not throw and lastSeen reflects revert", async () => {
     const { state, lastSeen } = seedRunningState("Plan");
     const tx = vi.fn(async (_id: string, name: string) => ({
-      identifier: "AGENT-447",
+      identifier: "PROJ-447",
       state: name,
     }));
     const cc = vi.fn(async () => {
@@ -312,14 +312,14 @@ describe("orchestrator review-gate enforcement", () => {
   });
 });
 
-// A-16 / S-D13 (Task 2) — actor-aware revert skip
-describe("reconciler skips revert when actor is human (A-16 / S-D13)", () => {
+// Actor-aware revert skip (see docs/adr/0020)
+describe("reconciler skips revert when actor is human", () => {
   /**
    * Build a stub Postgres pool that responds to the actor SELECT with
    * the row supplied by `actor`. Pass `null` for "no row" (the legacy
    * fallback path). `state` defaults to `"Implement"` to match the
    * `fresh.state` used in most tests below — pass an explicit value
-   * to exercise the stale-row guard (Copilot review on PR #691).
+   * to exercise the stale-row guard (Copilot review).
    */
   function makePool(
     actor: { actor_id: string; actor_type?: string; state?: string } | null,
@@ -351,7 +351,7 @@ describe("reconciler skips revert when actor is human (A-16 / S-D13)", () => {
     const transitionIssueToState =
       vi.fn<(id: string, name: string) => Promise<{ identifier: string; state: string }>>();
     transitionIssueToState.mockImplementation(async (_id, name) => ({
-      identifier: "AGENT-447",
+      identifier: "PROJ-447",
       state: name,
     }));
     const createComment =
@@ -439,7 +439,7 @@ describe("reconciler skips revert when actor is human (A-16 / S-D13)", () => {
   });
 
   it("falls back to legacy revert when actor row's last_state doesn't match observed state (stale row)", async () => {
-    // Stale-row guard (Copilot review on PR #691): if the recorded
+    // Stale-row guard (Copilot review): if the recorded
     // actor row reflects an OLDER state than what the orchestrator just
     // observed, we can't trust it — the webhook missed a delivery, or a
     // bot move came after the human one. Skipping revert based on a
@@ -463,7 +463,7 @@ describe("reconciler skips revert when actor is human (A-16 / S-D13)", () => {
     // before (status quo). lastSeen reflects the revert.
     const { state, lastSeen } = seedRunningState("Plan");
     const tx = vi.fn<(id: string, name: string) => Promise<{ identifier: string; state: string }>>(
-      async (_id, name) => ({ identifier: "AGENT-447", state: name }),
+      async (_id, name) => ({ identifier: "PROJ-447", state: name }),
     );
     const cc = vi.fn(async () => ({ id: "c1", url: "u" }));
     const onTerminal = vi.fn(async () => undefined);

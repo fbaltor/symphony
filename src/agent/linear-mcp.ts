@@ -1,5 +1,5 @@
 /**
- * In-process `linear_graphql` MCP server (A-12 / S-D10 — spec §10.5).
+ * In-process `linear_graphql` MCP server (spec §10.5).
  *
  * Exposes a single tool `linear_graphql({query, variables?})` that runs a
  * Linear GraphQL operation using Symphony's configured tracker auth. The
@@ -13,7 +13,7 @@
  * returned `{ type: "sdk", name, instance }` value is a REAL `McpServer`
  * instance with the `.connect()` method the SDK calls during query setup
  * — building a custom shape ourselves crashes with
- * `server.connect is not a function` (observed on AGENT-485 first deploy
+ * `server.connect is not a function` (observed on first deploy
  * 2026-05-04).
  */
 

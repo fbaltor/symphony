@@ -33,14 +33,14 @@ describe("getCostRollup", () => {
       {
         rows: [
           {
-            identifier: "AGENT-447",
+            identifier: "PROJ-447",
             total_usd: 19.29,
             runs: 5,
             first_seen: firstSeen,
             last_seen: lastSeen,
           },
           {
-            identifier: "AGENT-446",
+            identifier: "PROJ-446",
             total_usd: 7.5,
             runs: 2,
             first_seen: firstSeen,
@@ -56,13 +56,13 @@ describe("getCostRollup", () => {
     expect(result.monthUsd).toBe(87.65);
     expect(result.byIssue).toHaveLength(2);
     expect(result.byIssue[0]).toEqual({
-      identifier: "AGENT-447",
+      identifier: "PROJ-447",
       totalUsd: 19.29,
       runs: 5,
       firstSeen: firstSeen.toISOString(),
       lastSeen: lastSeen.toISOString(),
     });
-    expect(result.byIssue[1]?.identifier).toBe("AGENT-446");
+    expect(result.byIssue[1]?.identifier).toBe("PROJ-446");
   });
 
   it("rounds float sums to 2 decimals", async () => {

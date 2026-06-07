@@ -11,7 +11,7 @@ import { buildIdentifier } from "./build-info.js";
  *
  * Background: the orchestrator's auto-advance previously fired whenever a
  * turn returned `outcome=Succeeded`, regardless of whether the agent
- * actually pushed a branch / opened a PR. AGENT-441 and AGENT-439 reached
+ * actually pushed a branch / opened a PR. Two incidents reached
  * `Code Review` with empty branch state because their Validate-stage
  * agents converged on a no-op pattern and reported success. The
  * deliverable check below queries GitHub for branches matching the issue
@@ -75,7 +75,7 @@ export async function fetchBranches(
         Accept: "application/vnd.github+json",
         Authorization: `Bearer ${token}`,
         "X-GitHub-Api-Version": "2022-11-28",
-        // B-15: include version + sha so GitHub audit logs name the
+        // include version + sha so GitHub audit logs name the
         // exact running binary that made the call.
         "User-Agent": buildIdentifier(),
       },
@@ -122,7 +122,7 @@ export async function fetchBranches(
 
 /**
  * Decide whether any branch in `branches` looks like a deliverable for the
- * issue with `identifier` (e.g. "AGENT-441"). We accept any of:
+ * issue with `identifier` (e.g. "PROJ-441"). We accept any of:
  *
  *   - `symphony/<identifier-lowercased>`  (symphony's canonical pattern)
  *   - `agent-<number>`                    (legacy fallback pattern, kept as
@@ -165,7 +165,7 @@ export function branchMatchesIdentifier(branchName: string, identifier: string):
  * specialist's LLM turn still returns `outcome=Succeeded` because the
  * agent posted a substantive comment + exited cleanly. The orchestrator
  * then auto-advances Release → Done per `state_transitions["Release"]`,
- * marking the sub Done with PR still open. Real symptom on STG-17.
+ * marking the sub Done with PR still open.
  *
  * Fix: before auto-advancing Release → Done, the orchestrator queries
  * GitHub for the linked PR and confirms `merged_at` is non-null. If
@@ -205,7 +205,7 @@ export interface GithubPRStatus {
  * Per-call options for `fetchPullRequestForIssue`. Mirrors the shape of
  * `FetchBranchesOptions` for consistency, but lives in its own type so
  * call sites read self-explanatorily ("PR-status options" vs "branch
- * options"). Surfaced 2026-05-07 by Copilot review on PR #684.
+ * options"). Surfaced by Copilot review (2026-05-07).
  */
 export interface FetchPullRequestOptions {
   owner?: string;
@@ -297,7 +297,7 @@ export async function fetchPullRequestForIssue(
   // The detail request gets the SAME timeout/AbortController treatment as
   // the search call above — without it a stalled GitHub backend could hang
   // the orchestrator's auto-advance path indefinitely. Surfaced by Copilot
-  // review on PR #684. We also treat parse failures as `undefined`
+  // code review. We also treat parse failures as `undefined`
   // (transient → fail open), matching the search-call contract.
   const detailUrl = `${GITHUB_API_BASE}/repos/${owner}/${repo}/pulls/${pr.number}`;
   const detailAc = new AbortController();

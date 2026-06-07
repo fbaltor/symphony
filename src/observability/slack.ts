@@ -46,7 +46,7 @@ export interface SlackObserverOptions {
   token: string | undefined;
   channelId: string | undefined;
   /**
-   * A-30 / S-D22: optional Postgres pool for persisting the per-(issue,
+   * optional Postgres pool for persisting the per-(issue,
    * channel) thread root timestamp. When provided, the SlackObserver
    * survives restarts — subsequent posts on the same Linear issue still
    * land in the same Slack thread instead of opening a new root.
@@ -62,18 +62,18 @@ export interface SlackObserverOptions {
   clientFactory?: (token: string) => WebClient;
 }
 
-// B-14 / Cerebro pattern: rate-limit Slack posts so a flapping issue or a
+// Rate-limit Slack posts so a flapping issue or a
 // webhook storm can't blow past Slack's own rate ceiling AND fan-out their
 // own per-second post wall.
 const PER_ISSUE_MIN_GAP_MS = 5_000;
 const GLOBAL_TOKEN_BUCKET_CAPACITY = 20;
 const GLOBAL_TOKEN_BUCKET_WINDOW_MS = 60_000;
 
-// B-8 / Cerebro pattern (C-3): rate-limit rejection alerts per (kind, reason)
+// Rate-limit rejection alerts per (kind, reason)
 // pair across a 5-minute window. The same cause hammering 50 issues in one
 // tick should announce ONCE in Slack, not 50 times — operator visibility is
 // "something is broken, here's why" not "a list of every affected issue."
-// 5 min is the dampening window Cerebro Wave-19k+ landed on.
+// 5 min is the dampening window we landed on.
 const REJECTION_DAMPENING_WINDOW_MS = 5 * 60_000;
 
 export class SlackObserver {
@@ -84,13 +84,13 @@ export class SlackObserver {
   /** False after the first fatal auth error. All later calls early-return. */
   private slackHealthy = true;
   /**
-   * B-14: per-issue last-post-time cache for the 5s min-gap rate limit. A
+   * per-issue last-post-time cache for the 5s min-gap rate limit. A
    * flapping ticket (rapid state oscillations or webhook storm) can't blow
    * past one post per 5s on its own thread.
    */
   private lastPostPerIssueMs: Map<string, number> = new Map();
   /**
-   * B-14: global token bucket. 20 tokens refilled to capacity every 60s.
+   * global token bucket. 20 tokens refilled to capacity every 60s.
    * `lastRefillMs` tracks when the bucket was last fully replenished.
    * Sized to be comfortably under Slack's published per-channel rate
    * ceiling while leaving room for higher-priority posts.
@@ -98,7 +98,7 @@ export class SlackObserver {
   private globalTokens: number = GLOBAL_TOKEN_BUCKET_CAPACITY;
   private globalLastRefillMs: number = Date.now();
   /**
-   * B-8: per-`(kind, reason)` last-alert-time cache for the rejection
+   * per-`(kind, reason)` last-alert-time cache for the rejection
    * dampening window. Map key is `${kind}::${reason-or-empty}`. A burst of
    * identical rejections (e.g. 30 issues all hit the same daily-cap with
    * the same reason within one tick) collapses to a single Slack alert per
@@ -118,7 +118,7 @@ export class SlackObserver {
   }
 
   /**
-   * B-14: refill the global token bucket if at least one window has
+   * refill the global token bucket if at least one window has
    * elapsed since the last refill. Refills to capacity (not incremental
    * per-second) since the bucket is small and the window is short.
    */
@@ -131,7 +131,7 @@ export class SlackObserver {
   }
 
   /**
-   * B-14: try to consume one Slack-post token + check per-issue gap.
+   * try to consume one Slack-post token + check per-issue gap.
    * Returns `true` when the post should proceed, `false` when it should
    * be dropped (callers log `slack.rate_limited` and return early).
    */
@@ -222,7 +222,7 @@ export class SlackObserver {
 
   async announceDispatch(issue: Issue, attempt: number | null): Promise<void> {
     if (!this.client || !this.channelId || !this.slackHealthy) return;
-    // B-14: rate limit before constructing payload. Drop the post if either
+    // rate limit before constructing payload. Drop the post if either
     // the per-issue gap or global bucket says no.
     if (!this.acquirePostToken(issue.id)) return;
     const text =
@@ -232,7 +232,7 @@ export class SlackObserver {
     try {
       let ts = await this.resolveThreadTs(issue.id);
       if (!ts) {
-        // B-15 follow-up: include the running build identifier in the
+        // Include the running build identifier in the
         // root post so an operator can read it back to know which revision
         // was serving when the thread was opened. Format mirrors GitHub
         // App User-Agent (`symphony/<version>+<gitSha>`).
@@ -267,7 +267,7 @@ export class SlackObserver {
       costUsd?: number;
       error?: string;
       /**
-       * B-3 / D-21 (AGENT-529): prompt-cache observability. To emit the
+       * prompt-cache observability. To emit the
        * `cache_hit=NN.N%` segment ALL three of these conditions must hold:
        *   1. `cacheReadInputTokens` is defined and > 0 (a cache READ
        *      actually happened — first-dispatch cache writes don't count
@@ -277,8 +277,8 @@ export class SlackObserver {
        *      token universe; a partially-supplied call produces
        *      garbage percentages and is suppressed instead).
        * If any of those conditions fails the segment is omitted and the
-       * card falls back to the pre-B-3 format (just `tokens` + `cost`).
-       * Surfaced 2026-05-07 by Copilot review on PR #688.
+       * card falls back to the pre-cache format (just `tokens` + `cost`).
+       * Surfaced by Copilot review (2026-05-07).
        */
       cacheCreationInputTokens?: number;
       cacheReadInputTokens?: number;
@@ -286,7 +286,7 @@ export class SlackObserver {
     } = {},
   ): Promise<void> {
     if (!this.client || !this.channelId || !this.slackHealthy) return;
-    // B-14: rate-limited posts are dropped (logged but not queued). The
+    // rate-limited posts are dropped (logged but not queued). The
     // outcome is also captured in the audit log + Linear comment, so the
     // operator visibility loss is bounded.
     if (!this.acquirePostToken(issue.id)) return;
@@ -300,7 +300,7 @@ export class SlackObserver {
     const parts = [`${emoji} *${issue.identifier}* → \`${outcome}\``];
     if (typeof detail.tokens === "number") parts.push(`tokens=${detail.tokens}`);
     if (typeof detail.costUsd === "number") parts.push(`cost=$${detail.costUsd.toFixed(4)}`);
-    // B-3 / D-21: cache hit-rate as a fraction of total input-side tokens
+    // cache hit-rate as a fraction of total input-side tokens
     // (cache_read / (cache_read + cache_creation + input)). Emitted ONLY
     // when there's a real cache READ (cacheReadInputTokens > 0). The
     // first dispatch within a 5-min TTL window pays the cache-creation
@@ -310,7 +310,7 @@ export class SlackObserver {
     // "caching is working" signal. We also require all three fields to
     // be DEFINED (not just defaulted via `??`) so a partially-supplied
     // call doesn't print a misleading percentage from a wrong
-    // denominator. Surfaced by Copilot review on PR #688.
+    // denominator. Surfaced by Copilot review.
     if (
       typeof detail.cacheReadInputTokens === "number" &&
       detail.cacheReadInputTokens > 0 &&
@@ -340,7 +340,7 @@ export class SlackObserver {
   }
 
   /**
-   * B-8: announce a dispatch rejection (e.g. cost-cap exceeded, kill-switch
+   * announce a dispatch rejection (e.g. cost-cap exceeded, kill-switch
    * engaged) — collapsed across a 5-minute window so a burst of identical
    * rejections fires ONE alert.
    *
@@ -494,9 +494,9 @@ function extractSlackErrorCode(err: unknown): string | undefined {
  * stack traces), wrap the value in a code span in the caller — `` `${value}` ``
  * — and skip this helper, since code spans don't parse inner mrkdwn.
  *
- * Long-term: A-30 / S-D22 (persist Slack thread-ts in DB) lands first; a
+ * Long-term: persisting Slack thread-ts in DB lands first; a
  * follow-up could migrate to Block Kit `plain_text` sections, which avoid
- * mrkdwn parsing entirely. Out of scope for A-31.
+ * mrkdwn parsing entirely. Out of scope for now.
  */
 function escape(text: string): string {
   return text

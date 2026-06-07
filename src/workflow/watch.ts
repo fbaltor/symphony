@@ -110,7 +110,7 @@ export class WorkflowWatcher {
 
   /**
    * Force a reload from disk on demand. Used by the `POST /admin/reload`
-   * HTTP endpoint (A-32 / S-I5) — Cloud Run min=max=1 doesn't see file
+   * HTTP endpoint — Cloud Run min=max=1 doesn't see file
    * changes since the file is baked into the image, but an operator with
    * `gcloud run services proxy` access can hit `/admin/reload` after
    * editing the secret-mounted version of WORKFLOW.md without redeploying.
@@ -129,7 +129,7 @@ export class WorkflowWatcher {
     try {
       const raw = await loadWorkflow(this.path);
       const config = resolveConfig(raw, this.resolveCtx);
-      // A-8: Zod-parsed config can still fail spec §6.3 preflight (e.g.
+      // Zod-parsed config can still fail spec §6.3 preflight (e.g.
       // a literal `$SLACK_CHANNEL_ID` that survived expansion when the
       // env was unset). Reject the snapshot here so we keep last-known-good
       // instead of letting the orchestrator hit the failure on the next

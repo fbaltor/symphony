@@ -1,5 +1,5 @@
 /**
- * Release specialist module — §8 / E-15 of IMPROVEMENTS.md.
+ * Release specialist module for the 16-state pipeline (see docs/adr/0010).
  *
  * Exports a default `Specialist` object that the orchestrator's specialist
  * registry resolves by state name ("Release"). For now, `run()` is stubbed:

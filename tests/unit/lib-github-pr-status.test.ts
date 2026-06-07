@@ -8,7 +8,7 @@
  * merge) the merge command DOESN'T succeed but the LLM turn still reports
  * `outcome=Succeeded`. The orchestrator then default-advances Release → Done
  * per `state_transitions["Release"]`, marking the sub Done with the PR still
- * open. Real symptom on STG-17.
+ * open. Real symptom on PROJ-17.
  *
  * The fix: orchestrator calls this helper before the auto-advance and
  * confirms `merged_at` is non-null. If merged, advance normally. If still
@@ -70,7 +70,7 @@ describe("fetchPullRequestForIssue", () => {
         }),
       );
 
-    const result = await fetchPullRequestForIssue("ghs_test", "STG-42", {
+    const result = await fetchPullRequestForIssue("ghs_test", "PROJ-42", {
       owner: "o",
       repo: "r",
       fetchImpl: fetchMock as unknown as typeof fetch,
@@ -108,7 +108,7 @@ describe("fetchPullRequestForIssue", () => {
         }),
       );
 
-    const result = await fetchPullRequestForIssue("ghs_test", "STG-99", {
+    const result = await fetchPullRequestForIssue("ghs_test", "PROJ-99", {
       owner: "o",
       repo: "r",
       fetchImpl: fetchMock as unknown as typeof fetch,
@@ -123,7 +123,7 @@ describe("fetchPullRequestForIssue", () => {
   it("returns null when search returns no items (no PR found → bounce)", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ items: [] }));
 
-    const result = await fetchPullRequestForIssue("ghs_test", "STG-17", {
+    const result = await fetchPullRequestForIssue("ghs_test", "PROJ-17", {
       owner: "o",
       repo: "r",
       fetchImpl: fetchMock as unknown as typeof fetch,
@@ -139,7 +139,7 @@ describe("fetchPullRequestForIssue", () => {
       new Response("{}", { status: 503, headers: { "content-type": "application/json" } }),
     );
 
-    const result = await fetchPullRequestForIssue("ghs_test", "STG-17", {
+    const result = await fetchPullRequestForIssue("ghs_test", "PROJ-17", {
       owner: "o",
       repo: "r",
       fetchImpl: fetchMock as unknown as typeof fetch,
@@ -151,7 +151,7 @@ describe("fetchPullRequestForIssue", () => {
   it("returns undefined when search throws (network failure → fail open)", async () => {
     fetchMock.mockRejectedValueOnce(new Error("ECONNRESET"));
 
-    const result = await fetchPullRequestForIssue("ghs_test", "STG-17", {
+    const result = await fetchPullRequestForIssue("ghs_test", "PROJ-17", {
       owner: "o",
       repo: "r",
       fetchImpl: fetchMock as unknown as typeof fetch,
@@ -181,7 +181,7 @@ describe("fetchPullRequestForIssue", () => {
         }),
       );
 
-    const result = await fetchPullRequestForIssue("ghs_test", "STG-42", {
+    const result = await fetchPullRequestForIssue("ghs_test", "PROJ-42", {
       owner: "o",
       repo: "r",
       fetchImpl: fetchMock as unknown as typeof fetch,
@@ -196,7 +196,7 @@ describe("fetchPullRequestForIssue", () => {
     // instead, which would also pick up unrelated PRs).
     fetchMock.mockResolvedValueOnce(jsonResponse({ items: [] }));
 
-    await fetchPullRequestForIssue("ghs_test", "STG-99", {
+    await fetchPullRequestForIssue("ghs_test", "PROJ-99", {
       owner: "owner-x",
       repo: "repo-y",
       fetchImpl: fetchMock as unknown as typeof fetch,
@@ -210,14 +210,14 @@ describe("fetchPullRequestForIssue", () => {
     // confirm the load-bearing tokens survive the round trip.
     expect(decodeURIComponent(String(url))).toContain("repo:owner-x/repo-y");
     expect(decodeURIComponent(String(url))).toContain("type:pr");
-    expect(decodeURIComponent(String(url))).toContain("STG-99");
+    expect(decodeURIComponent(String(url))).toContain("PROJ-99");
     expect(decodeURIComponent(String(url))).toContain("in:body");
   });
 
   it("authenticates with bearer token and passes Accept + API version headers", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ items: [] }));
 
-    await fetchPullRequestForIssue("ghs_test_token", "STG-1", {
+    await fetchPullRequestForIssue("ghs_test_token", "PROJ-1", {
       owner: "o",
       repo: "r",
       fetchImpl: fetchMock as unknown as typeof fetch,

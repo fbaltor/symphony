@@ -8,10 +8,10 @@ Symphony is an autonomous orchestrator implementing the **16-state pipeline** �
 
 The canonical references:
 
-- [`docs/adr/0010-16-state-pipeline.md`](docs/adr/0010-16-state-pipeline.md) — pipeline shape, prompt-in-code design, Postgres-backed metadata.
+- [`docs/adr/`](docs/adr/) — architecture decisions: the 16-state pipeline (`0010`), single-instance lock, cost caps, audit/cache, Slack, webhook ingress, redaction, capability matrix, kill-switch, deliverable gate, reconciler, build provenance, prompts-in-code (`0011`–`0022`).
+- [`docs/design-notes.md`](docs/design-notes.md) — smaller design decisions not warranting a full ADR.
 - [`WORKFLOW.example.md`](WORKFLOW.example.md) — annotated 16-state config template.
 - [`README.md`](README.md) — service overview, layout, deviations from the OpenAI Symphony spec.
-- [`docs/backlog.md`](docs/backlog.md) — deferred work and known limitations. Check before starting any non-trivial task; the item you are about to implement may already be scoped there.
 
 ## Self-edit lock
 

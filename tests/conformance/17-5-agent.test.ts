@@ -102,7 +102,7 @@ describe("§17.5 claude adapter", () => {
     expect(res.outcome).not.toBe("completed");
   });
 
-  // B-3 / D-21 / AGENT-529 — prompt caching invariants
+  // Prompt caching invariants
   describe("prompt caching", () => {
     it("passes excludeDynamicSections:true on the systemPrompt to enable cross-dispatch caching", async () => {
       const seen: { systemPrompt?: unknown } = {};

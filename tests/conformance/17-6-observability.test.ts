@@ -42,7 +42,7 @@ describe("§17.6 observability", () => {
     ).resolves.toBeUndefined();
   });
 
-  // B-3 / D-21 / AGENT-529 — cache hit-rate in announceOutcome
+  // Cache hit-rate in announceOutcome
   describe("announceOutcome cache hit-rate", () => {
     /**
      * Drive announceOutcome with a stub WebClient so we can capture the
@@ -109,7 +109,7 @@ describe("§17.6 observability", () => {
       // (cache_creation_input_tokens > 0) but reads zero. Emitting
       // `cache_hit=0.0%` here would falsely imply caching is disabled.
       // Operators see the segment appear from the second dispatch onward.
-      // Surfaced by Copilot review on PR #688.
+      // Surfaced by Copilot review.
       const { observer, lastText } = makeObserverCapturing();
       await observer.announceOutcome(issue, "Succeeded", {
         tokens: 1000,
@@ -147,7 +147,7 @@ describe("§17.6 observability", () => {
       // cacheCreationInputTokens are missing, computing the hit-rate
       // with `?? 0` defaults would produce `cache_hit=100.0%` — wildly
       // misleading. The denominator must reflect the full input-side
-      // token universe. Surfaced by Copilot review on PR #688.
+      // token universe. Surfaced by Copilot review.
       const { observer, lastText } = makeObserverCapturing();
       await observer.announceOutcome(issue, "Succeeded", {
         tokens: 1000,

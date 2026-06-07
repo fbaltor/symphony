@@ -22,9 +22,8 @@
  *   3. WORKFLOW.md doesn't have to change for existing deployments — the
  *      `agent.profile_by_state` field added below is optional.
  *
- * The Cerebro precedent (`SPECIALIST_CAPABILITY_MATRIX`) declares one
- * entry per specialist (research, plan, refinement, implementer, ops,
- * larry). Symphony's analogue is one entry per **canonical stage profile**
+ * The natural design declares one capability entry per specialist.
+ * Symphony's analogue is one entry per **canonical stage profile**
  * — multiple Linear states can map to the same profile via
  * `agent.profile_by_state`. That separates "what the work IS" from "what
  * the operator named the workflow column."
@@ -53,7 +52,7 @@ export interface StateCapabilityProfile {
   /** Workspace subpaths the agent may write to. `undefined` ⇒ no
    *  per-stage restriction (default workspace-wide rule); `[]` ⇒ no
    *  file writes allowed at all. Mirrors the schema used by
-   *  `agent.writeCwdsByState` (B-12). */
+   *  `agent.writeCwdsByState`. */
   readonly writeCwds: readonly string[] | undefined;
   /** MCP server names this stage uses. Drives a future `disallowedMcpServers`
    *  filter; today purely descriptive. */
@@ -73,7 +72,7 @@ export interface StateCapabilityProfile {
  * stage. The invariant tests will refuse to compile / pass until each new
  * profile has all four Rule-of-Two fields populated.
  *
- * Today the matrix has three entries — one for the canonical Cerebro-style
+ * Today the matrix has three entries — one for each of the canonical
  * pipeline phases (analysis-only, write-and-test, deliver-pr). Operators
  * map their Linear state names to these via WORKFLOW.md
  * `agent.profile_by_state`.
@@ -112,13 +111,13 @@ export const STATE_CAPABILITY_PROFILES: Readonly<Record<string, StateCapabilityP
     untrustedInputs: {
       present: true,
       source: "user-authored Linear issue body + plan from previous stage",
-      mitigations: ["B-9 secret redactor scans agent output before commit/push"],
+      mitigations: ["secret redactor scans agent output before commit/push"],
     },
     sensitiveAccess: {
       present: true,
-      source: "Read tool unbounded; Bash filtered by B-12 guard",
+      source: "Read tool unbounded; Bash filtered by write-scope guard",
       mitigations: [
-        "Self-edit lock blocks independent/symphony/* writes",
+        "Self-edit lock blocks writes to Symphony's own source tree",
         "Bash patterns block sudo/curl/wget/nc/ssh/cd-root/rm-rf/fork-bomb",
       ],
     },
@@ -144,7 +143,7 @@ export const STATE_CAPABILITY_PROFILES: Readonly<Record<string, StateCapabilityP
     untrustedInputs: {
       present: true,
       source: "diff to be summarized + prior stage Linear comments",
-      mitigations: ["B-9 secret redactor catches accidental key inclusion in PR description"],
+      mitigations: ["secret redactor catches accidental key inclusion in PR description"],
     },
     sensitiveAccess: {
       present: true,

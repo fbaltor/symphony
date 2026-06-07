@@ -4,7 +4,7 @@ import { logger } from "../observability/logger.js";
 /**
  * Persistent backing store for the orchestrator's `lastSeenState` Map.
  *
- * A-17 / S-D14: closes the gap where the in-memory Map reset on every
+ * closes the gap where the in-memory Map reset on every
  * Cloud Run revision rollover, leaving the first reconciler tick after a
  * restart unable to detect unauthorized review-gate moves (no `prev` to
  * compare against). Read on startup, written through on every set/delete.

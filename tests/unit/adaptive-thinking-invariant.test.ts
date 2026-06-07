@@ -3,9 +3,9 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 /**
- * B-4 invariant: Anthropic 2026 SDK rejects `thinking: { type: "enabled",
+ * Invariant: Anthropic 2026 SDK rejects `thinking: { type: "enabled",
  * budget_tokens: N }` on Opus 4.7+ with a 400. Symphony MUST use the
- * adaptive variant (`thinking: { type: "adaptive", effort }`) per A-10.
+ * adaptive variant (`thinking: { type: "adaptive", effort }`).
  *
  * This test grep-scans `src/` for the literal `budget_tokens` and the
  * old enabled-thinking shape, failing CI if either reappears. Cheaper

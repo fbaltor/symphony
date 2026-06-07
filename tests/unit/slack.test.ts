@@ -120,7 +120,7 @@ describe("SlackObserver — suppression on invalid_auth", () => {
 
     const slack = new SlackObserver({ token: "xoxb-ok", channelId: "C-bad" });
     await slack.announceDispatch(issue, null);
-    // B-14: per-issue 5s gap blocks back-to-back posts. Reset for the test.
+    // Per-issue 5s gap blocks back-to-back posts. Reset for the test.
     slack._resetRateLimitsForTests();
     await slack.announceDispatch(issue, null);
 
@@ -151,7 +151,7 @@ describe("SlackObserver — threading", () => {
 
     const slack = new SlackObserver({ token: "xoxb-ok", channelId: "C123" });
     await slack.announceDispatch(issue, null);
-    // B-14: per-issue 5s gap blocks back-to-back posts. Reset for the test.
+    // Per-issue 5s gap blocks back-to-back posts. Reset for the test.
     slack._resetRateLimitsForTests();
     await slack.announceOutcome(issue, "Succeeded", { tokens: 1234, costUsd: 0.0567 });
 
@@ -194,7 +194,7 @@ describe("SlackObserver — threading", () => {
 
     const slack = new SlackObserver({ token: "xoxb-ok", channelId: "C123" });
     await slack.announceDispatch(issue, null);
-    // B-14: per-issue 5s gap blocks back-to-back posts. Reset between calls.
+    // Per-issue 5s gap blocks back-to-back posts. Reset between calls.
     slack._resetRateLimitsForTests();
     await slack.announceDispatch(issue, 1);
     slack._resetRateLimitsForTests();
@@ -211,7 +211,7 @@ describe("SlackObserver — threading", () => {
   });
 });
 
-describe("SlackObserver — rejection alerts (B-8)", () => {
+describe("SlackObserver — rejection alerts", () => {
   it("posts the first rejection alert, then dampens identical (kind, reason) pairs within 5 min", async () => {
     const { SlackObserver } = await import("../../src/observability/slack.js");
     postMessage.mockResolvedValue({ ok: true, ts: "1700000000.000999" });

@@ -7,8 +7,8 @@
  *   - `turn_failed`
  *   - `turn_cancelled`
  *
- * **Reserved (declared for spec parity; emitted once IMPROVEMENTS.md A-22
- * — live event stream wiring — lands):**
+ * **Reserved (declared for spec parity; emitted once the live event-stream
+ * wiring lands — see docs/design-notes.md):**
  *   - `session_started` — fires when the adapter opens a Claude / Codex
  *     session (today the SDK has no long-lived subprocess between turns,
  *     but the spec mandates one event per session lifecycle).
@@ -17,13 +17,13 @@
  *     `RunAttemptStatus`.
  *   - `turn_ended_with_error` — turn produced a final result message with
  *     `is_error: true` rather than throwing. Today rolled into
- *     `turn_failed`; A-22 splits it out so observers can distinguish
+ *     `turn_failed`; a future split lets observers distinguish
  *     "model returned an error" from "turn was killed".
  *   - `turn_input_required` — model paused awaiting tool/user input.
  *     Symphony runs autonomously so this is currently treated as a
- *     spurious stall; A-22 will surface it for status-page visibility.
+ *     spurious stall; a future event will surface it for status-page visibility.
  *   - `approval_auto_approved` — `permissionMode: 'bypassPermissions'`
- *     auto-approved a tool call. A-22 records these for audit; today
+ *     auto-approved a tool call. A future event records these for audit; today
  *     they're invisible.
  *   - `unsupported_tool_call` — model called a tool the adapter doesn't
  *     advertise. Useful for surfacing misconfigured MCP wiring.

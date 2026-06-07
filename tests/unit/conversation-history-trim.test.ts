@@ -6,7 +6,7 @@ import { selectSubstantiveComments, type SymphonyComment } from "../../src/track
  * comment window. Background: hot-patch #5 injected up to 25 prior comments
  * verbatim per dispatch, growing the prompt ~quadratically across stages
  * (Refinement → Plan → Validate → Implement → … → Done) and burning
- * ~$0.30/turn just on comment-history input on AGENT-447.
+ * ~$0.30/turn just on comment-history input.
  */
 
 const ISO = (n: number): string => new Date(2026, 3, 1, 9, n, 0).toISOString();
@@ -25,17 +25,6 @@ describe("selectSubstantiveComments", () => {
     const result = selectSubstantiveComments(input);
     expect(result).toHaveLength(1);
     expect(result[0]?.body).toContain("## Requirements");
-  });
-
-  it("drops <!-- cerebro:specialist=... lifecycle telemetry comments", () => {
-    const input: SymphonyComment[] = [
-      comment("<!-- cerebro:specialist=refiner -->\nRefiner pass complete", 1),
-      comment("## RFC\n- File: src/x.ts", 2),
-      comment("<!-- cerebro:specialist=planner -->\nPlanner pass complete", 3),
-    ];
-    const result = selectSubstantiveComments(input);
-    expect(result).toHaveLength(1);
-    expect(result[0]?.body).toContain("## RFC");
   });
 
   it("keeps ## Requirements / ## RFC / ## RCA / ## Implementer's checklist blocks", () => {

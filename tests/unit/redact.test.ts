@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { redactSecrets, redactStringsRecursive } from "../../src/lib/redact.js";
 
 /**
- * T-017 (AGENT-503) fixture vectors + Bug E (`runGraphqlForAgent` redaction)
- * coverage. Locks down the B-9 patterns so a future edit in `redact.ts` keeps
+ * Secret-shape fixture vectors + agent-side (`runGraphqlForAgent` redaction)
+ * coverage. Locks down the redaction patterns so a future edit in `redact.ts` keeps
  * covering the three canonical credential shapes the orchestrator emits in
  * Linear comments AND so agent-side MCP variables get the same scrub.
  *
@@ -15,14 +15,14 @@ import { redactSecrets, redactStringsRecursive } from "../../src/lib/redact.js";
  * happy while producing the correct runtime value.
  */
 
-// `sk-ant-` + 30 alnum chars (B-9 anthropic_api_key shape).
+// `sk-ant-` + 30 alnum chars (anthropic_api_key shape).
 const FAKE_ANTHROPIC = "sk-" + "ant-" + "FAKE0000ZZZ1111YYY2222XXX3333W";
-// `ghp_` + 36 alnum chars (B-9 github_pat_classic shape).
+// `ghp_` + 36 alnum chars (github_pat_classic shape).
 const FAKE_GITHUB_PAT = "ghp" + "_FAKE0000zzzz1111yyyy2222xxxx3333wwww";
-// `AKIA` + 16 uppercase-alnum chars (B-9 aws_access_key_id shape).
+// `AKIA` + 16 uppercase-alnum chars (aws_access_key_id shape).
 const FAKE_AWS_KEY_ID = "AKI" + "AFAKE0000ZZZZ1111";
 
-describe("redactSecrets — T-017 fixture vectors (B-9)", () => {
+describe("redactSecrets — fixture vectors", () => {
   it("redacts all three canonical shapes when concatenated", () => {
     const body = `Anthropic: ${FAKE_ANTHROPIC}\nGitHub: ${FAKE_GITHUB_PAT}\nAWS: ${FAKE_AWS_KEY_ID}`;
     expect(redactSecrets(body)).toBe(
@@ -67,15 +67,15 @@ describe("redactSecrets — T-017 fixture vectors (B-9)", () => {
     expect(redactSecrets(`id=${lower}`)).toBe(`id=${lower}`);
   });
 
-  it("preserves innocent text (no false positives on T-017 narrative)", () => {
+  it("preserves innocent text (no false positives on innocent narrative)", () => {
     const narrative =
-      "B-9 should redact secret-shaped values when an agent posts them. " +
+      "Should redact secret-shaped values when an agent posts them. " +
       "Three fixture shapes: anthropic, github_pat_classic, aws_access_key_id.";
     expect(redactSecrets(narrative)).toBe(narrative);
   });
 });
 
-describe("redactStringsRecursive — Bug E coverage for agent-side MCP variables", () => {
+describe("redactStringsRecursive — coverage for agent-side MCP variables", () => {
   it("scrubs a top-level GraphQL `variables` map (commentCreate.input.body)", () => {
     const variables = {
       input: {

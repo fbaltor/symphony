@@ -69,7 +69,7 @@ export interface IssueTracker {
   /** Return all direct children of a parent issue. Used by cascade modules. */
   fetchChildIssues(parentId: string): Promise<ChildIssue[]>;
 
-  // --- sub-ticketing extensions (A-19 / E-12) ---
+  // --- sub-ticketing extensions ---
   //
   // The orchestrator's post-Plan sub-ticket fan-out and the technical-plan
   // re-plan path call these through the `IssueTracker` type. They were

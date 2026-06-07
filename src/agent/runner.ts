@@ -35,7 +35,7 @@ export interface AgentSessionHandle {
    * Per-issue workspace path the adapter was opened against. Adapter
    * implementations MUST populate this in `startSession` so callers can
    * read it back without a side-channel (replaces the Symbol-keyed
-   * mutation that pre-A-25 lived in claude-adapter.ts).
+   * mutation that previously lived in claude-adapter.ts).
    *
    * The orchestrator's `runWorker` invariant (spec §9.5) requires the
    * agent process's cwd matches this path. Adapters that spawn a
@@ -68,7 +68,7 @@ export interface RunTurnArgs {
    */
   signal?: AbortSignal;
   /**
-   * A-29 / S-D24: per-issue cumulative cost cap (USD). When set together
+   * per-issue cumulative cost cap (USD). When set together
    * with `alreadyRecordedCostUsd`, the adapter checks each cost-bearing
    * SDK message against `recorded + currentTurnCost` and aborts the turn
    * mid-stream if the cumulative would exceed the cap. Surfaces as
@@ -77,20 +77,20 @@ export interface RunTurnArgs {
    */
   perIssueCapUsd?: number;
   /**
-   * A-29: cumulative USD already recorded against this issue (sum of
+   * cumulative USD already recorded against this issue (sum of
    * prior turns' final costs from `symphony.budget_state`). Used together
    * with `perIssueCapUsd` to drive mid-turn abort.
    */
   alreadyRecordedCostUsd?: number;
   /**
-   * B-6: per-state turn cost cap (USD). When set, the adapter aborts
+   * per-state turn cost cap (USD). When set, the adapter aborts
    * mid-stream if THIS TURN's running cost exceeds the cap (independent
    * of `perIssueCapUsd`). 0 / undefined disables the per-state check.
    * Looked up by orchestrator from `guardrails.perStateCapUsd[state]`.
    */
   perStateCapUsd?: number;
   /**
-   * B-12: per-state write-scope discipline. When set, restrict Edit /
+   * per-state write-scope discipline. When set, restrict Edit /
    * Write / MultiEdit calls to only paths inside one of these workspace
    * subdirectories. An explicit empty array `[]` means "no file writes
    * at all" (e.g. plan-only stages). `undefined` ⇒ no scope restriction
@@ -111,7 +111,7 @@ export interface RunTurnResult {
    * `inputTokens` and `outputTokens` are the standard non-cached
    * accumulations. `cacheCreationInputTokens` + `cacheReadInputTokens`
    * are subsets of what would have been input tokens had Anthropic prompt
-   * caching been disabled (B-3 / D-21 / AGENT-529). `cacheReadInputTokens`
+   * caching been disabled. `cacheReadInputTokens`
    * starts at zero on the first dispatch within a 5-min cache TTL window
    * and grows as subsequent dispatches reuse the same system-prompt
    * prefix; `cacheCreationInputTokens` accounts for the extra-fee

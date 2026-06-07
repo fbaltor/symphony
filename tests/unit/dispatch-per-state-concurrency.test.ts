@@ -18,7 +18,7 @@ import type { Issue, RunningEntry } from "../../src/types.js";
 function makeIssue(overrides: Partial<Issue> = {}): Issue {
   return {
     id: "i1",
-    identifier: "AGENT-1",
+    identifier: "PROJ-1",
     title: "t",
     description: null,
     priority: 2,
@@ -72,10 +72,10 @@ describe("dispatch per-state concurrency", () => {
   it("skips a candidate when the per-state limit is reached", () => {
     const state = createState(30_000, 10);
     // 1 Implement already running; per-state limit is 1.
-    const running = makeIssue({ id: "running-1", identifier: "AGENT-100" });
+    const running = makeIssue({ id: "running-1", identifier: "PROJ-100" });
     state.running.set(running.id, makeRunning(running));
 
-    const candidate = makeIssue({ id: "i2", identifier: "AGENT-101" });
+    const candidate = makeIssue({ id: "i2", identifier: "PROJ-101" });
     const result = isEligible(candidate, {
       state,
       activeStates: ACTIVE_STATES,
@@ -91,10 +91,10 @@ describe("dispatch per-state concurrency", () => {
     // Global cap: 10 → plenty of headroom. Per-state cap on Implement: 1.
     // The per-state gate must still kick in.
     const state = createState(30_000, 10);
-    const running = makeIssue({ id: "running-1", identifier: "AGENT-100" });
+    const running = makeIssue({ id: "running-1", identifier: "PROJ-100" });
     state.running.set(running.id, makeRunning(running));
 
-    const candidate = makeIssue({ id: "i2", identifier: "AGENT-101" });
+    const candidate = makeIssue({ id: "i2", identifier: "PROJ-101" });
     const result = isEligible(candidate, {
       state,
       activeStates: ACTIVE_STATES,
@@ -110,13 +110,13 @@ describe("dispatch per-state concurrency", () => {
   it("allows a candidate in a different (cheap) state to proceed concurrently", () => {
     const state = createState(30_000, 10);
     // Saturate Implement (1/1)…
-    const impl = makeIssue({ id: "running-impl", identifier: "AGENT-100" });
+    const impl = makeIssue({ id: "running-impl", identifier: "PROJ-100" });
     state.running.set(impl.id, makeRunning(impl));
 
     // …but a Refinement candidate has 5 slots; should be eligible.
     const refinement = makeIssue({
       id: "i2",
-      identifier: "AGENT-200",
+      identifier: "PROJ-200",
       state: "Refinement",
     });
     const result = isEligible(refinement, {
@@ -136,7 +136,7 @@ describe("dispatch per-state concurrency", () => {
 
     const candidate = makeIssue({
       id: "i2",
-      identifier: "AGENT-300",
+      identifier: "PROJ-300",
       state: "Investigate",
     });
     const result = isEligible(candidate, {
@@ -153,14 +153,14 @@ describe("dispatch per-state concurrency", () => {
     // candidate must be rejected by the per-state gate (which folds in the
     // fallback) rather than slipping through.
     const state = createState(30_000, 2);
-    const r1 = makeIssue({ id: "r1", identifier: "AGENT-400", state: "Test" });
-    const r2 = makeIssue({ id: "r2", identifier: "AGENT-401", state: "Test" });
+    const r1 = makeIssue({ id: "r1", identifier: "PROJ-400", state: "Test" });
+    const r2 = makeIssue({ id: "r2", identifier: "PROJ-401", state: "Test" });
     state.running.set(r1.id, makeRunning(r1));
     state.running.set(r2.id, makeRunning(r2));
 
     const candidate = makeIssue({
       id: "i3",
-      identifier: "AGENT-402",
+      identifier: "PROJ-402",
       state: "Test",
     });
     const result = isEligible(candidate, {
@@ -181,13 +181,13 @@ describe("dispatch per-state concurrency", () => {
     // continues, a *different* issue in the same state must still be
     // blocked while the running one occupies the per-state slot.
     const state = createState(30_000, 10);
-    const continuing = makeIssue({ id: "cont-1", identifier: "AGENT-500" });
+    const continuing = makeIssue({ id: "cont-1", identifier: "PROJ-500" });
     state.running.set(continuing.id, makeRunning(continuing));
 
     expect(runningInState(state, "Implement")).toBe(1);
     expect(perStateLimit(state, PER_STATE_MAP, "Implement")).toBe(1);
 
-    const sibling = makeIssue({ id: "i2", identifier: "AGENT-501" });
+    const sibling = makeIssue({ id: "i2", identifier: "PROJ-501" });
     const result = isEligible(sibling, {
       state,
       activeStates: ACTIVE_STATES,
@@ -204,20 +204,20 @@ describe("dispatch per-state concurrency", () => {
     const state = createState(30_000, 10);
     const running = makeIssue({
       id: "r1",
-      identifier: "AGENT-600",
+      identifier: "PROJ-600",
       state: "Open PR",
     });
     state.running.set(running.id, makeRunning(running));
     const r2 = makeIssue({
       id: "r2",
-      identifier: "AGENT-601",
+      identifier: "PROJ-601",
       state: "Open PR",
     });
     state.running.set(r2.id, makeRunning(r2));
 
     const candidate = makeIssue({
       id: "i3",
-      identifier: "AGENT-602",
+      identifier: "PROJ-602",
       state: "Open PR",
     });
     const result = isEligible(candidate, {

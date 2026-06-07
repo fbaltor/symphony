@@ -28,7 +28,7 @@ import type { Issue, RunningEntry } from "../../src/types.js";
 function fakeIssue(state: string): Issue {
   return {
     id: "issue-id-1",
-    identifier: "STG-1",
+    identifier: "PROJ-1",
     title: "Some sub-issue",
     description: null,
     priority: null,

@@ -17,8 +17,8 @@
  * The variable is concatenated to the Read-tool content for every text
  * file (`B = Xo(A.file) + Fn8;`). The system prompt can't override this
  * — it lands as a tool-result-side reminder after the prompt context is
- * already set. Symphony's autonomous mode hits this on AGENT-441,
- * AGENT-447, AGENT-439: agent reads source files, gets the reminder,
+ * already set. Symphony's autonomous mode hits this when the
+ * agent reads source files, gets the reminder,
  * legitimately refuses to push code, the orchestrator's deliverable
  * check (hot-patch #14) eventually escalates to Error.
  *

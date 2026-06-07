@@ -20,7 +20,7 @@ describe("§17.3 tracker client", () => {
     ).toThrow(TrackerError);
   });
 
-  it("accepts team_id alone (cerebro-team mode)", () => {
+  it("accepts team_id alone (team mode)", () => {
     expect(
       () =>
         new LinearTrackerClient({

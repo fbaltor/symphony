@@ -1,5 +1,5 @@
 /**
- * A-22: bounded async queue for the AgentEvent stream.
+ * bounded async queue for the AgentEvent stream.
  *
  * Producer (claude-adapter `runTurn`) calls `push(event)` synchronously
  * for every SDK message that maps to one of our spec-defined event

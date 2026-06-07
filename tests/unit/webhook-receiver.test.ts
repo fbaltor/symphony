@@ -1,5 +1,5 @@
 /**
- * Webhook receiver unit tests — Phase 2.6 of the 16-state pipeline (E-17/E-18).
+ * Webhook receiver unit tests — Phase 2.6 of the 16-state pipeline.
  *
  * These tests construct a minimal IncomingMessage / ServerResponse pair and
  * drive `handleLinearWebhook` directly — no real HTTP socket, no real DB.
@@ -152,7 +152,7 @@ function buildPayload(
     createdAt: new Date().toISOString(),
     data: override.data ?? {
       id: "issue-uuid-1",
-      identifier: "STG-1",
+      identifier: "PROJ-1",
       state: { name: "Development" },
     },
     updatedFrom: { stateId: "old-state-id" },
@@ -208,7 +208,7 @@ describe("Linear webhook receiver", () => {
     tracker.childrenByParent.set("parent-uuid-1", [
       {
         id: "sub-1",
-        identifier: "STG-101",
+        identifier: "PROJ-101",
         title: "A",
         state: "Subtask drafted",
         description: null,
@@ -221,7 +221,7 @@ describe("Linear webhook receiver", () => {
       type: "Issue",
       data: {
         id: "parent-uuid-1",
-        identifier: "STG-100",
+        identifier: "PROJ-100",
         state: { name: "Development" },
       },
     });
@@ -263,7 +263,7 @@ describe("Linear webhook receiver", () => {
       type: "Issue",
       data: {
         id: "parent-uuid-1",
-        identifier: "STG-100",
+        identifier: "PROJ-100",
         state: { name: "Development" },
       },
     });
@@ -316,7 +316,7 @@ describe("Linear webhook receiver", () => {
       type: "Issue",
       data: {
         id: "parent-uuid-1",
-        identifier: "STG-100",
+        identifier: "PROJ-100",
         state: { name: "Development" },
       },
       webhookTimestamp: Date.now() - (FRESHNESS_WINDOW_MS + 5_000),
@@ -348,7 +348,7 @@ describe("Linear webhook receiver", () => {
       type: "Issue",
       data: {
         id: "parent-uuid-1",
-        identifier: "STG-100",
+        identifier: "PROJ-100",
         state: { name: "Development" },
       },
       webhookId: "duplicate-id-X",
@@ -404,7 +404,7 @@ describe("Linear webhook receiver", () => {
     tracker.childrenByParent.set("parent-uuid-cancel", [
       {
         id: "sub-c1",
-        identifier: "STG-201",
+        identifier: "PROJ-201",
         title: "A",
         state: "Implementation (manual)",
         description: null,
@@ -412,7 +412,7 @@ describe("Linear webhook receiver", () => {
       },
       {
         id: "sub-c2",
-        identifier: "STG-202",
+        identifier: "PROJ-202",
         title: "B",
         state: "Done",
         description: null,
@@ -425,7 +425,7 @@ describe("Linear webhook receiver", () => {
       type: "Issue",
       data: {
         id: "parent-uuid-cancel",
-        identifier: "STG-200",
+        identifier: "PROJ-200",
         state: { name: "Canceled" },
         // No `parent` field — this is a parent issue.
       },
@@ -458,7 +458,7 @@ describe("Linear webhook receiver", () => {
     tracker.childrenByParent.set("parent-of-sub", [
       {
         id: "sub-d1",
-        identifier: "STG-301",
+        identifier: "PROJ-301",
         title: "A",
         state: "Done",
         description: null,
@@ -466,7 +466,7 @@ describe("Linear webhook receiver", () => {
       },
       {
         id: "sub-d2",
-        identifier: "STG-302",
+        identifier: "PROJ-302",
         title: "B",
         state: "Done",
         description: null,
@@ -479,9 +479,9 @@ describe("Linear webhook receiver", () => {
       type: "Issue",
       data: {
         id: "sub-d1",
-        identifier: "STG-301",
+        identifier: "PROJ-301",
         state: { name: "Done" },
-        parent: { id: "parent-of-sub", identifier: "STG-300" },
+        parent: { id: "parent-of-sub", identifier: "PROJ-300" },
       },
     });
     const sig = signBody(body);
@@ -508,21 +508,21 @@ describe("Linear webhook receiver", () => {
   });
 
   /* ------------------------------------------------------------------------
-   * 8b. Issue.update sub → Done with `parentId` (no `parent` object) — AGENT-546 fix
+   * 8b. Issue.update sub → Done with `parentId` (no `parent` object) — PROJ-546 fix
    * ------------------------------------------------------------------------ */
   it("fires runSubDoneWatcher when payload has parentId only (no parent object)", async () => {
     // 2026-05-07 hot-fix: Linear's webhook payload for state-only
     // Issue.update events often OMITS the full `parent` object — the
     // change set is just `state`, so Linear sends `parentId` as a flat
     // string instead. Before this fix the receiver only checked
-    // `data.parent?.id`, missing the dispatch entirely. AGENT-546 was
-    // observed stuck in `Development` after AGENT-547 → Done because of
+    // `data.parent?.id`, missing the dispatch entirely. PROJ-546 was
+    // observed stuck in `Development` after PROJ-547 → Done because of
     // exactly this. The fix mirrors the `Issue.create` branch's
     // existing `data.parent?.id ?? data.parentId` fallback.
     tracker.childrenByParent.set("parent-of-sub-flat", [
       {
         id: "sub-flat-1",
-        identifier: "AGENT-547",
+        identifier: "PROJ-547",
         title: "Bump landing-page navbar logo",
         state: "Done",
         description: null,
@@ -535,7 +535,7 @@ describe("Linear webhook receiver", () => {
       type: "Issue",
       data: {
         id: "sub-flat-1",
-        identifier: "AGENT-547",
+        identifier: "PROJ-547",
         state: { name: "Done" },
         // Linear's state-only update payload — `parent` object omitted,
         // `parentId` provided as a flat string.
@@ -645,7 +645,7 @@ describe("Linear webhook receiver", () => {
       type: "Issue",
       data: {
         id: "parent-uuid-2",
-        identifier: "STG-200",
+        identifier: "PROJ-200",
         state: { name: "Development" },
       },
       // Subscription ID — same for every delivery from this webhook.
@@ -682,7 +682,7 @@ describe("Linear webhook receiver", () => {
       type: "Issue",
       data: {
         id: "parent-uuid-3",
-        identifier: "STG-300",
+        identifier: "PROJ-300",
         state: { name: "Development" },
       },
       webhookId: "subscription-uuid-shared",
@@ -720,7 +720,7 @@ describe("Linear webhook receiver", () => {
       type: "Issue",
       data: {
         id: "parent-uuid-4",
-        identifier: "STG-400",
+        identifier: "PROJ-400",
         state: { name: "Development" },
       },
       webhookId: sharedSubscription,
@@ -741,7 +741,7 @@ describe("Linear webhook receiver", () => {
       type: "Issue",
       data: {
         id: "parent-uuid-4",
-        identifier: "STG-400",
+        identifier: "PROJ-400",
         state: { name: "Development" },
       },
       webhookId: sharedSubscription,
@@ -778,7 +778,7 @@ describe("Linear webhook receiver", () => {
       type: "Issue",
       data: {
         id: "parent-uuid-5",
-        identifier: "STG-500",
+        identifier: "PROJ-500",
         state: { name: "Development" },
       },
     });

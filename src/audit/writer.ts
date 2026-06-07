@@ -2,14 +2,14 @@ import type pg from "pg";
 import { logger } from "../observability/logger.js";
 
 /**
- * Task 2 (2026-05-06) — in-flight run tracking.
+ * In-flight run tracking.
  *
  * Each worker writes a `running_runs` row on dispatch and deletes it
  * on terminal outcome. If the container dies (OOM, OOM-aware SIGKILL,
  * Cloud Run scale-down without grace), the row stays. The next
  * orchestrator boot's reaper finds these rows, writes synthetic
  * `outcome=Killed` audit rows, and deletes them — closing the
- * cost-truth gap surfaced by AGENT-521 where 6 OOM'd Implement
+ * cost-truth gap where 6 OOM'd Implement
  * dispatches produced ZERO audit rows.
  */
 
@@ -168,15 +168,15 @@ export interface AuditRow {
   costUsd: number;
   error: string | null;
   /**
-   * B-2: per-run prompt provenance. Set this from the build SHA
-   * (`readGitSha()`) until TL-2 lands per-stage prompt modules; once
+   * per-run prompt provenance. Set this from the build SHA
+   * (`readGitSha()`) until per-stage prompt modules land; once
    * `src/agents/<state>/prompt.ts` exists, set to the prompt file's
    * content hash so a regression to a specific prompt is post-hoc
    * analyzable.
    */
   promptVersion?: string | null;
   /**
-   * B-3 / D-21 (AGENT-529): Anthropic prompt-cache observability.
+   * Anthropic prompt-cache observability.
    * Both fields default to 0 in the schema, so older callers that don't
    * pass them produce a row with cache_*_tokens = 0 and don't break.
    * Optional in the AuditRow type for the same reason — the orphan-reaper
@@ -222,7 +222,7 @@ export async function writeRunAudit(pool: pg.Pool, row: AuditRow): Promise<void>
       row.costUsd,
       row.error,
       row.promptVersion ?? null,
-      // B-3 / D-21: 0 default mirrors the SQL DEFAULT 0; older callers
+      // 0 default mirrors the SQL DEFAULT 0; older callers
       // (orphan reaper passing only the 14 historical fields) end up with
       // 0 here, which is the right answer — a Killed run has no usage.
       row.cacheCreationInputTokens ?? 0,

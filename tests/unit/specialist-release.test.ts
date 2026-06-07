@@ -1,5 +1,5 @@
 /**
- * Unit tests for the Release specialist (§8 / E-15 of IMPROVEMENTS.md).
+ * Unit tests for the Release specialist.
  *
  * Two halves:
  *   1. Pure-function tests — SYSTEM_PROMPT shape + buildUserMessage output.
@@ -97,15 +97,15 @@ describe("Release specialist — SYSTEM_PROMPT", () => {
 
 describe("Release specialist — buildUserMessage", () => {
   it("includes the issue identifier and title in the header", () => {
-    const ctx = makeCtx({ issue: makeIssue({ identifier: "STG-77", title: "Cool change" }) });
+    const ctx = makeCtx({ issue: makeIssue({ identifier: "PROJ-77", title: "Cool change" }) });
     const msg = buildUserMessage(ctx);
-    expect(msg).toContain("# Release turn for STG-77 — Cool change");
+    expect(msg).toContain("# Release turn for PROJ-77 — Cool change");
   });
 
   it("instructs the agent to look up the PR via `Closes <identifier>` search", () => {
-    const ctx = makeCtx({ issue: makeIssue({ identifier: "STG-99" }) });
+    const ctx = makeCtx({ issue: makeIssue({ identifier: "PROJ-99" }) });
     const msg = buildUserMessage(ctx);
-    expect(msg).toContain('gh pr list --search "Closes STG-99"');
+    expect(msg).toContain('gh pr list --search "Closes PROJ-99"');
   });
 
   it("echoes cumulative cost when seeded via ctx.extra", () => {
