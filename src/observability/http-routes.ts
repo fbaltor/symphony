@@ -4,7 +4,7 @@ import type { Orchestrator } from "../orchestrator/orchestrator.js";
 import type { IssueTracker } from "../tracker/tracker.js";
 import type { SymphonyConfig } from "../workflow/config.js";
 import type { WorkflowWatcher } from "../workflow/watch.js";
-import { getCostRollup } from "../audit/queries.js";
+import { getCostRollup, getUsageRollup } from "../audit/queries.js";
 import { SYMPHONY_VERSION, readGitSha } from "../lib/build-info.js";
 import { handleLinearWebhook, isWebhookPath } from "../webhook/index.js";
 import { clearKillSwitch, engageKillSwitch, readKillSwitch } from "./kill-switch.js";
@@ -117,6 +117,27 @@ export async function handleHttpRequest(
       });
     } catch (err) {
       logger.warn({ err: (err as Error).message }, "/cost handler failed");
+      respondJson(res, 500, { error: (err as Error).message });
+    }
+    return;
+  }
+
+  // `GET /usage`: token + estimated-cost rollup over rolling windows (5h / 24h
+  // / 7d), per model. The CC subscription's real limit is a rolling-window rate
+  // limit, not $ — watch output_tokens (Opus is heaviest) to avoid a 429.
+  if (url === "/usage") {
+    if (!ctx.pool) {
+      respondJson(res, 503, { status: "starting", error: ctx.bootstrapError });
+      return;
+    }
+    try {
+      const usage = await getUsageRollup(ctx.pool);
+      respondJson(res, 200, {
+        note: "CC subscription limit is rolling-window rate limits (~5h + weekly), not $. cost_usd is the SDK estimate (proxy); output_tokens on Opus is the heaviest draw.",
+        ...usage,
+      });
+    } catch (err) {
+      logger.warn({ err: (err as Error).message }, "/usage handler failed");
       respondJson(res, 500, { error: (err as Error).message });
     }
     return;

@@ -155,6 +155,101 @@ export async function getCostRollup(pool: pg.Pool): Promise<CostRollup> {
   }
 }
 
+// ─── Usage rollup (token + estimated-cost over rolling windows) ──────────────
+// The Claude Code subscription bills $0 but is capped by rolling-window rate
+// limits (≈5h + weekly on Max, model-weighted — Opus is heaviest). cost_usd is
+// the SDK's ESTIMATE and a proxy only; output_tokens on Opus is the real draw.
+// This rollup surfaces both so the operator can tailor effort/model/concurrency
+// before hitting a 429.
+
+export interface UsageModelRow {
+  model: string;
+  turns: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  costUsd: number;
+}
+
+export interface UsageWindow {
+  turns: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  costUsd: number;
+  byModel: UsageModelRow[];
+}
+
+export interface UsageRollup {
+  window_5h: UsageWindow;
+  window_24h: UsageWindow;
+  window_7d: UsageWindow;
+}
+
+const EMPTY_WINDOW: UsageWindow = {
+  turns: 0,
+  inputTokens: 0,
+  outputTokens: 0,
+  totalTokens: 0,
+  costUsd: 0,
+  byModel: [],
+};
+
+async function usageForWindow(pool: pg.Pool, interval: string): Promise<UsageWindow> {
+  // `interval` is a fixed in-code constant (never user input); passed as a
+  // bound param + cast so there's no string interpolation into the SQL.
+  const res = await pool.query<{
+    model: string;
+    turns: number;
+    in_tok: string;
+    out_tok: string;
+    tot_tok: string;
+    usd: number;
+  }>(
+    `SELECT COALESCE(model, '(unknown)') AS model,
+       COUNT(*)::int                          AS turns,
+       COALESCE(SUM(input_tokens), 0)::bigint  AS in_tok,
+       COALESCE(SUM(output_tokens), 0)::bigint AS out_tok,
+       COALESCE(SUM(total_tokens), 0)::bigint  AS tot_tok,
+       COALESCE(SUM(cost_usd), 0)::float8      AS usd
+     FROM run_audit
+     WHERE started_at >= now() - $1::interval
+     GROUP BY model
+     ORDER BY out_tok DESC`,
+    [interval],
+  );
+  const byModel: UsageModelRow[] = res.rows.map((r) => ({
+    model: r.model,
+    turns: r.turns,
+    inputTokens: Number(r.in_tok),
+    outputTokens: Number(r.out_tok),
+    totalTokens: Number(r.tot_tok),
+    costUsd: round2(r.usd),
+  }));
+  return {
+    turns: byModel.reduce((a, m) => a + m.turns, 0),
+    inputTokens: byModel.reduce((a, m) => a + m.inputTokens, 0),
+    outputTokens: byModel.reduce((a, m) => a + m.outputTokens, 0),
+    totalTokens: byModel.reduce((a, m) => a + m.totalTokens, 0),
+    costUsd: round2(byModel.reduce((a, m) => a + m.costUsd, 0)),
+    byModel,
+  };
+}
+
+export async function getUsageRollup(pool: pg.Pool): Promise<UsageRollup> {
+  try {
+    const [w5h, w24h, w7d] = await Promise.all([
+      usageForWindow(pool, "5 hours"),
+      usageForWindow(pool, "24 hours"),
+      usageForWindow(pool, "7 days"),
+    ]);
+    return { window_5h: w5h, window_24h: w24h, window_7d: w7d };
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, "getUsageRollup failed; returning zeros");
+    return { window_5h: EMPTY_WINDOW, window_24h: EMPTY_WINDOW, window_7d: EMPTY_WINDOW };
+  }
+}
+
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
