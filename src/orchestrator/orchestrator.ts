@@ -6,7 +6,13 @@ import { preflightValidate, type SymphonyConfig } from "../workflow/config.js";
 import type { WorkflowSnapshot, WorkflowWatcher } from "../workflow/watch.js";
 import type { IssueTracker } from "../tracker/tracker.js";
 import { availableSlots, createState, perStateLimit, runningInState } from "./state.js";
-import { computeBackoffMs, isEligible, sortForDispatch } from "./dispatch.js";
+import {
+  classifyTickAction,
+  computeBackoffMs,
+  isEligible,
+  isFreshTransition,
+  sortForDispatch,
+} from "./dispatch.js";
 import { reconcileStalledRuns, reconcileTrackerStates } from "./reconcile.js";
 import { ensureWorkspace } from "../workspace/manager.js";
 import { runHook } from "../workspace/hooks.js";
@@ -674,10 +680,11 @@ export class Orchestrator {
         // Agent-dispatched states (e.g. "To implement"): no LLM specialist, but
         // they SHOULD run an autonomous turn via the generic WORKFLOW envelope.
         // They must bypass BOTH no-specialist skips below to reach dispatch().
-        const isAgentDispatched = this.currentConfig.tracker.agentDispatchedStates.some(
+        const isAgentDispatched = (this.currentConfig.tracker.agentDispatchedStates ?? []).some(
           (s) => s.toLowerCase() === stateLower,
         );
-        if (!isAgentDispatched && !hasSpecialist && !hasTransition) {
+        const tickAction = classifyTickAction({ hasSpecialist, hasTransition, isAgentDispatched });
+        if (tickAction === "cascade_only") {
           logger.debug(
             { issue: issue.identifier, state: issue.state },
             "skipping dispatch: cascade-only state (no specialist, no auto-advance edge)",
@@ -694,7 +701,7 @@ export class Orchestrator {
         // exits. Fire the auto-advance directly here and skip dispatch
         // entirely — the next tick will pick up the issue in its new
         // (specialist-owned) state.
-        if (!isAgentDispatched && !hasSpecialist && hasTransition) {
+        if (tickAction === "transition_only") {
           const nextState = this.lookupNextState(issue.state);
           if (nextState) {
             logger.info(
@@ -797,10 +804,14 @@ export class Orchestrator {
       // state — even if the cascade itself throws.
       this.cascadeTriggerLastState.set(issue.id, next);
 
-      if (!prev || prev.toLowerCase() === next.toLowerCase()) continue;
+      // Fire on a fresh observation in `next`. `prev` is undefined when the
+      // parent moved in from a NON-active state the poll loop never saw — e.g.
+      // the "Plan review (manual)" human gate → "Development". Treating that as
+      // a transition is the fix for the cascade never firing from a human gate;
+      // the cascade is idempotent, so a redundant fire is a harmless no-op.
+      if (!isFreshTransition(prev, next)) continue;
 
-      // Development cascade: parent moved into Development from somewhere
-      // else (typically Plan review (manual)). Fan out drafted subs.
+      // Development cascade: parent entered Development. Fan out drafted subs.
       if (next.toLowerCase() === "development") {
         const cascadeLogger = withContext({
           issue_id: issue.id,

@@ -45,6 +45,50 @@ export function isEligible(issue: Issue, inputs: DispatchInputs): { ok: boolean;
 }
 
 /**
+ * Tick-loop routing for an eligible issue. Pure classifier extracted from the
+ * orchestrator so the carve-out is unit-testable.
+ *
+ *   - `dispatch`        — run a turn (a specialist owns the state, OR it's an
+ *                         agent-dispatched state that runs the generic WORKFLOW
+ *                         envelope, e.g. "To implement").
+ *   - `transition_only` — no specialist, no agent-dispatch, but a
+ *                         state_transitions edge exists → auto-advance without
+ *                         dispatching (e.g. "Ready to deploy" → "PR validation").
+ *   - `cascade_only`    — no specialist, no transition, not agent-dispatched →
+ *                         visited only so detectAndFireCascades can fire
+ *                         (e.g. "Development"); no turn runs on the parent.
+ *
+ * `isAgentDispatched` wins over both no-specialist skips: that is the whole
+ * point of `agent_dispatched_states` — let a no-specialist state reach a turn.
+ */
+export type TickAction = "dispatch" | "transition_only" | "cascade_only";
+
+export function classifyTickAction(opts: {
+  hasSpecialist: boolean;
+  hasTransition: boolean;
+  isAgentDispatched: boolean;
+}): TickAction {
+  if (opts.isAgentDispatched) return "dispatch";
+  if (opts.hasSpecialist) return "dispatch";
+  return opts.hasTransition ? "transition_only" : "cascade_only";
+}
+
+/**
+ * Cascade-trigger gate: has the issue been *freshly* observed in `next`?
+ *
+ * `prev` is the last state the poll loop recorded for this issue. A parent that
+ * moves from a non-active human gate (e.g. "Plan review (manual)") into a
+ * cascade-trigger state was NEVER observed before — `prev` is undefined — so we
+ * MUST treat undefined as a fresh transition, or the cascade never fires from a
+ * human gate. Only an already-observed same-state (`prev === next`) is stale.
+ * The cascade is idempotent, so a redundant fire is a no-op (no duplicate
+ * comment when there are no drafted subs).
+ */
+export function isFreshTransition(prev: string | undefined, next: string): boolean {
+  return prev === undefined || prev.toLowerCase() !== next.toLowerCase();
+}
+
+/**
  * Spec §8.2 — sort order: priority asc (null last) → created_at oldest first
  * → identifier lexicographic.
  */
