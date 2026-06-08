@@ -111,13 +111,17 @@ In the coordinator model the heavy lifting runs in the human's local toolchain; 
 
 ## Getting started
 
+> For the full operator runbook (commands + the day-to-day Linear workflow) see
+> [`docs/operating.md`](docs/operating.md); for the consolidated architecture +
+> current capabilities/status see [`docs/architecture-and-status.md`](docs/architecture-and-status.md).
+
 ### Prerequisites
 
 - Node.js 22+
 - pnpm (or npm)
 - Postgres database (see `src/audit/schema.sql`)
 - Linear account with API key
-- Anthropic API key
+- **Claude auth** — a Claude Code subscription OAuth token (`claude setup-token` → `CLAUDE_CODE_OAUTH_TOKEN`) **or** an `ANTHROPIC_API_KEY`
 
 ### Install
 
@@ -126,7 +130,8 @@ git clone https://github.com/fbaltor/symphony.git
 cd symphony
 npm install
 cp .env.example .env
-# Fill in LINEAR_API_KEY, ANTHROPIC_API_KEY, DATABASE_URL
+# Fill in LINEAR_API_KEY, DATABASE_URL, and Claude auth
+# (CLAUDE_CODE_OAUTH_TOKEN for the subscription, or ANTHROPIC_API_KEY)
 ```
 
 ### Configure
@@ -144,7 +149,7 @@ npm run migrate          # apply src/audit/schema.sql to your Postgres
 npm run dev              # starts the daemon via tsx watch
 ```
 
-The daemon polls your Linear team every 30 seconds. Edit `WORKFLOW.md` while the daemon runs — config reloads live without restart.
+The daemon polls your Linear team every 30 seconds. Apply `WORKFLOW.md` changes with `POST /admin/reload` (or a restart); `src/` changes need a rebuild.
 
 ## Test
 
@@ -160,11 +165,12 @@ npm run test:integration # real Linear (skipped without credentials)
 | Path | Auth | Purpose |
 | --- | --- | --- |
 | `GET /health` | none | Liveness probe — `{status:"ok"}` once bootstrapped |
-| `GET /status` | admin token | In-memory snapshot: running issues, retry queue, resolved config |
-| `GET /cost` | admin token | Spend rollup: today/month, top-20 issues, cap headroom |
+| `GET /status` | none | In-memory snapshot: running issues, retry queue, resolved config |
+| `GET /cost` | none | Spend rollup: today/month, top-20 issues, cap headroom |
+| `GET /usage` | none | Token + estimated-cost rollup (5h/24h/7d, per model) |
 | `POST /admin/reload` | admin token | Re-read WORKFLOW.md and re-run reconciliation (no redeploy needed) |
 | `POST /admin/kill-switch` | admin token | `?op=engage\|clear\|status` — halt dispatch + drain workers |
-| `POST /webhooks/linear` | HMAC | Linear webhook receiver |
+| `POST /webhook/linear` | HMAC | Linear webhook receiver |
 
 Set `SYMPHONY_ADMIN_TOKEN` to authenticate the admin routes. Set `LINEAR_WEBHOOK_SECRET` for the webhook receiver.
 
